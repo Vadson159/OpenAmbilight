@@ -60,3 +60,9 @@ Run `ambilight_hotkey.ahk` (requires [AutoHotkey v2](https://www.autohotkey.com/
 
 ## How it works
 The script captures your screen directly from the GPU using `dxcam` (Desktop Duplication API), which uses almost 0% CPU. It then calculates the most vibrant dominant color using `numpy`, smoothly transitions the colors, and sends commands over a local TCP connection to the OpenRGB SDK Server.
+
+---
+## Support
+If you find this project helpful, consider supporting its development:
+
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/vadson)
