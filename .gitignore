@@ -17,3 +17,7 @@ env/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Local OpenRGB build toolchain and binary backups
+_orgb_build/
+OpenRGB-patched/backup/

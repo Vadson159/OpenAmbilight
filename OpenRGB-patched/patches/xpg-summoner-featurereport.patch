@@ -1,0 +1,195 @@
+diff --git a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp
+index ca9877f3..5ccf98df 100644
+--- a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp
++++ b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp
+@@ -10,6 +10,7 @@
+ \*---------------------------------------------------------*/
+ 
+ #include <cstring>
++#include <chrono>
+ #include "XPGSummonerController.h"
+ #include "StringUtils.h"
+ 
+@@ -20,22 +21,39 @@ XPGSummonerController::XPGSummonerController(hid_device *dev_handle, const char
+     name     = dev_name;
+     usb_pid  = pid;
+ 
++    has_frame     = false;
++    keepalive_run = true;
++    memset(last_frame, 0x00, sizeof(last_frame));
++
+     SendInitialize();
++
++    /*-----------------------------------------------------------------*\
++    | The Summoner's lighting reverts to OFF if it does not receive a   |
++    | color frame within ~2 s. Start a keep-alive thread that re-sends  |
++    | the last frame so static colors set from the GUI stay lit.        |
++    \*-----------------------------------------------------------------*/
++    keepalive_thread = std::thread(&XPGSummonerController::KeepAliveLoop, this);
+ }
+ 
+ XPGSummonerController::~XPGSummonerController()
+ {
++    keepalive_run = false;
++    if(keepalive_thread.joinable())
++    {
++        keepalive_thread.join();
++    }
+     hid_close(dev);
+ }
+ 
+ void XPGSummonerController::SendInitialize()
+ {
++    std::lock_guard<std::mutex> lock(send_mutex);
+     unsigned char init_buf[265] =
+     {
+         0x07, 0xEA, 0x00, 0x00,
+     };
+     memset(init_buf + 4, 0x00, 261);
+-    hid_write(dev, init_buf, 265);
++    hid_send_feature_report(dev, init_buf, 264);
+     std::this_thread::sleep_for(std::chrono::milliseconds(2));
+ }
+ 
+@@ -69,19 +87,63 @@ unsigned short XPGSummonerController::GetUSBPID()
+ 
+ void XPGSummonerController::SendColors(unsigned char *color_data, unsigned int color_data_size)
+ {
+-    const int leds_count     = 126;
+-    const int bytes_per_led  = 4;
+-    const int total_bytes    = leds_count * bytes_per_led;
+-    const int block_size     = 256;
+-    int zones                = 2;
++    std::lock_guard<std::mutex> lock(send_mutex);
++
++    /*-----------------------------------------------------------------*\
++    | Cache the frame so the keep-alive thread can re-send it.          |
++    \*-----------------------------------------------------------------*/
++    unsigned int copy = (color_data_size < (unsigned int)XPG_SUMMONER_FRAME_SIZE) ? color_data_size : (unsigned int)XPG_SUMMONER_FRAME_SIZE;
++    memcpy(last_frame, color_data, copy);
++    if(copy < (unsigned int)XPG_SUMMONER_FRAME_SIZE)
++    {
++        memset(last_frame + copy, 0x00, XPG_SUMMONER_FRAME_SIZE - copy);
++    }
++    has_frame = true;
++
++    SendFrameLocked();
++}
++
++void XPGSummonerController::SendFrameLocked()
++{
++    /*-----------------------------------------------------------------*\
++    | Split the cached 504-byte frame into the two feature packets.     |
++    | Caller must already hold send_mutex.                              |
++    \*-----------------------------------------------------------------*/
++    const int total_bytes = XPG_SUMMONER_FRAME_SIZE;
++    const int block_size  = 256;
++    const int zones       = 2;
+ 
+     for(int zone = 0; zone < zones; zone++)
+     {
+-        int offset      = zone * block_size;
+-        int remaining   = total_bytes - offset;
+-        color_data_size = (remaining > block_size) ? block_size : remaining;
++        int offset    = zone * block_size;
++        int remaining = total_bytes - offset;
++        int size      = (remaining > block_size) ? block_size : remaining;
+ 
+-        SendColorDataPacket(zone, &color_data[offset], color_data_size);
++        SendColorDataPacket((unsigned char)zone, &last_frame[offset], (unsigned int)size);
++    }
++}
++
++void XPGSummonerController::KeepAliveLoop()
++{
++    while(keepalive_run)
++    {
++        /*-------------------------------------------------------------*\
++        | Sleep ~800 ms in short steps so shutdown stays responsive.    |
++        \*-------------------------------------------------------------*/
++        for(int i = 0; i < 8 && keepalive_run; i++)
++        {
++            std::this_thread::sleep_for(std::chrono::milliseconds(100));
++        }
++        if(!keepalive_run)
++        {
++            break;
++        }
++
++        std::lock_guard<std::mutex> lock(send_mutex);
++        if(has_frame)
++        {
++            SendFrameLocked();
++        }
+     }
+ }
+ 
+@@ -101,7 +163,7 @@ unsigned int XPGSummonerController::SendColorDataPacket(
+     unsigned int copy_size = (color_size > 256) ? 256 : color_size;
+     memcpy(&packet[6], color_data, copy_size);
+ 
+-    hid_write(dev, packet, 265);
++    hid_send_feature_report(dev, packet, 264);
+ 
+     std::this_thread::sleep_for(std::chrono::milliseconds(2));
+     return copy_size;
+@@ -115,11 +177,12 @@ void XPGSummonerController::SendTerminateColorPacket()
+     | any active color effects on the |
+     | keyboard.                       |
+     \*-------------------------------*/
++    std::lock_guard<std::mutex> lock(send_mutex);
+     unsigned char terminate_buf[265] =
+     {
+         0x07, 0xEA, 0x00, 0x00,
+     };
+     memset(terminate_buf + 4, 0x00, 261);
+-    hid_write(dev, terminate_buf, 265);
++    hid_send_feature_report(dev, terminate_buf, 264);
+     std::this_thread::sleep_for(std::chrono::milliseconds(2));
+ }
+diff --git a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h
+index 59580afd..514428e4 100644
+--- a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h
++++ b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h
+@@ -12,6 +12,9 @@
+ #pragma once
+ 
+ #include <string>
++#include <thread>
++#include <mutex>
++#include <atomic>
+ #include "hidapi.h"
+ #include "RGBController.h"
+ 
+@@ -25,6 +28,11 @@
+ \*-----------------------------------------------------*/
+ #define XPG_SUMMONER_PID 0x9418
+ 
++/*-----------------------------------------------------*\
++| Number of bytes in a full color frame (126 LEDs x 4) |
++\*-----------------------------------------------------*/
++#define XPG_SUMMONER_FRAME_SIZE (126 * 4)
++
+ enum
+ {
+     XPG_SUMMONER_MODE_OFF           =    0x00,
+@@ -66,4 +74,19 @@ private:
+     std::string location;
+     std::string name;
+     unsigned short usb_pid;
++
++    /*-----------------------------------------------------------------*\
++    | Keep-alive: the Summoner reverts to OFF if it does not receive a  |
++    | color frame within ~2 s, so a background thread re-sends the last |
++    | frame periodically to hold a static color (e.g. when set from the |
++    | OpenRGB GUI and left idle).                                       |
++    \*-----------------------------------------------------------------*/
++    unsigned char      last_frame[XPG_SUMMONER_FRAME_SIZE];
++    bool               has_frame;
++    std::mutex         send_mutex;
++    std::atomic<bool>  keepalive_run;
++    std::thread        keepalive_thread;
++
++    void SendFrameLocked();   /* sends last_frame as two feature packets; caller must hold send_mutex */
++    void KeepAliveLoop();
+ };

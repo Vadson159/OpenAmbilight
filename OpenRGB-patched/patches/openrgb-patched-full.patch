@@ -1,0 +1,1429 @@
+diff --git a/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp b/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp
+index f94f1bcc..012c0a94 100644
+--- a/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp
++++ b/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp
+@@ -11,11 +11,76 @@
+ \*---------------------------------------------------------*/
+ 
+ #include <cstring>
++#include <mutex>
+ #include <vector>
+ #include "KingstonFuryDRAMController.h"
+ #include "RGBController.h"
+ #include "LogManager.h"
+ 
++#ifdef _WIN32
++#include <windows.h>
++#endif
++
++/*---------------------------------------------------------*\
++| KingstonFuryTimerBoost                                    |
++|                                                           |
++|   The PawnIO SMBus module waits out every transaction     |
++|   with a kernel sleep, so each register write costs about |
++|   one timer tick. OpenRGB holds the timer at 1 ms         |
++|   (startup/main_Windows.cpp), where a 72-register DDR5    |
++|   frame takes ~200 ms; at 0.5 ms it takes ~95 ms. Asking  |
++|   for 0.5 ms only while a frame is being written keeps    |
++|   the speed without pinning the whole system to a 2 kHz   |
++|   tick the rest of the time.                              |
++|                                                           |
++|   A process has a single timer resolution request, so     |
++|   leaving the last boost scope puts back the 1 ms that    |
++|   main_Windows.cpp asked for, rather than releasing it.   |
++\*---------------------------------------------------------*/
++#ifdef _WIN32
++static std::mutex   fury_timer_boost_mutex;
++static unsigned int fury_timer_boost_count = 0;
++
++static void FurySetTimerResolution(ULONG resolution_100ns)
++{
++    typedef LONG (NTAPI *NTSETTIMERRESOLUTION)(ULONG DesiredResolution, BOOLEAN SetResolution, PULONG CurrentResolution);
++
++    static NTSETTIMERRESOLUTION NtSetTimerResolution =
++        (NTSETTIMERRESOLUTION)(void *)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtSetTimerResolution");
++
++    ULONG current_resolution;
++
++    if(NtSetTimerResolution != NULL)
++    {
++        NtSetTimerResolution(resolution_100ns, TRUE, &current_resolution);
++    }
++}
++#endif
++
++KingstonFuryTimerBoost::KingstonFuryTimerBoost()
++{
++#ifdef _WIN32
++    std::lock_guard<std::mutex> lock(fury_timer_boost_mutex);
++
++    if(fury_timer_boost_count++ == 0)
++    {
++        FurySetTimerResolution(5000);
++    }
++#endif
++}
++
++KingstonFuryTimerBoost::~KingstonFuryTimerBoost()
++{
++#ifdef _WIN32
++    std::lock_guard<std::mutex> lock(fury_timer_boost_mutex);
++
++    if(--fury_timer_boost_count == 0)
++    {
++        FurySetTimerResolution(10000);
++    }
++#endif
++}
++
+ KingstonFuryDRAMController::KingstonFuryDRAMController(i2c_smbus_interface* bus, unsigned char base_addr, std::vector<int> slots, std::string dev_name)
+ {
+     this->bus       = bus;
+@@ -320,14 +385,33 @@ void KingstonFuryDRAMController::SetLEDColors(std::vector<RGBColor> colors)
+         return;
+     }
+ 
+-    unsigned int led_per_dimm = GetLEDPerDIMM();
++    /*-----------------------------------------------------------------*\
++    | Write every colour register back to back and delay only once, at  |
++    | the end.                                                          |
++    |                                                                   |
++    | SetRegister() sleeps FURY_DELAY after each register it actually   |
++    | writes. A solid colour changes all three channels of all LEDs, so |
++    | routing the colour data through SetRegister() spends              |
++    | 3 x LEDs-per-DIMM x FURY_DELAY = 360 ms per frame on a DDR5 pair  |
++    | -- two orders of magnitude more than any other device here takes, |
++    | which is what makes the DRAM trail the rest of the system by      |
++    | roughly half a second when it is driven from a screen-sync app.   |
++    |                                                                   |
++    | The delay exists for the transaction handshake (begin / index /   |
++    | apply), not for the colour registers: the modules accept those    |
++    | back to back, which is how the vendor software drives them at     |
++    | full frame rate. One delay after the last register is enough to   |
++    | let the controller settle before SendApply() latches the frame.   |
++    \*-----------------------------------------------------------------*/
++    unsigned int led_per_dimm  = GetLEDPerDIMM();
++    bool         write_occurred = false;
++
+     for(unsigned int led_idx = 0; led_idx < led_per_dimm; led_idx++)
+     {
+-        int red_register    = FURY_REG_BASE_RED   + 3 * led_idx;
+-        int green_register  = FURY_REG_BASE_GREEN + 3 * led_idx;
+-        int blue_register   = FURY_REG_BASE_BLUE  + 3 * led_idx;
++        unsigned char red_register   = (unsigned char)(FURY_REG_BASE_RED   + 3 * led_idx);
++        unsigned char green_register = (unsigned char)(FURY_REG_BASE_GREEN + 3 * led_idx);
++        unsigned char blue_register  = (unsigned char)(FURY_REG_BASE_BLUE  + 3 * led_idx);
+ 
+-        std::vector<unsigned char> reds, greens, blues;
+         for(std::size_t slot_idx = 0; slot_idx < GetSlotCount(); slot_idx++)
+         {
+             RGBColor color      = colors[slot_idx * led_per_dimm + led_idx];
+@@ -335,14 +419,15 @@ void KingstonFuryDRAMController::SetLEDColors(std::vector<RGBColor> colors)
+             unsigned char green = RGBGetGValue(color);
+             unsigned char blue  = RGBGetBValue(color);
+ 
+-            reds.push_back(red);
+-            greens.push_back(green);
+-            blues.push_back(blue);
++            write_occurred = CachedWrite((int)slot_idx, red_register,   red)   || write_occurred;
++            write_occurred = CachedWrite((int)slot_idx, blue_register,  blue)  || write_occurred;
++            write_occurred = CachedWrite((int)slot_idx, green_register, green) || write_occurred;
+         }
++    }
+ 
+-        SetRegister(red_register, reds);
+-        SetRegister(blue_register, blues);
+-        SetRegister(green_register, greens);
++    if(write_occurred)
++    {
++        std::this_thread::sleep_for(FURY_DELAY);
+     }
+ }
+ 
+diff --git a/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.h b/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.h
+index 15e5154e..81ee009e 100644
+--- a/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.h
++++ b/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.h
+@@ -121,6 +121,17 @@ enum
+     FURY_DIR_TOP_TO_BOTTOM            = 0x02,
+ };
+ 
++/*---------------------------------------------------------*\
++| Holds the process timer resolution at 0.5 ms while it is  |
++| in scope; see KingstonFuryDRAMController.cpp for why.     |
++\*---------------------------------------------------------*/
++class KingstonFuryTimerBoost
++{
++public:
++    KingstonFuryTimerBoost();
++    ~KingstonFuryTimerBoost();
++};
++
+ class KingstonFuryDRAMController
+ {
+ public:
+diff --git a/Controllers/KingstonFuryDRAMController/RGBController_KingstonFuryDRAM.cpp b/Controllers/KingstonFuryDRAMController/RGBController_KingstonFuryDRAM.cpp
+index 73c4e34f..b6e2db39 100644
+--- a/Controllers/KingstonFuryDRAMController/RGBController_KingstonFuryDRAM.cpp
++++ b/Controllers/KingstonFuryDRAMController/RGBController_KingstonFuryDRAM.cpp
+@@ -447,6 +447,8 @@ unsigned char RGBController_KingstonFuryDRAM::GetRealModeValue()
+ 
+ void RGBController_KingstonFuryDRAM::DeviceUpdateLEDs()
+ {
++    KingstonFuryTimerBoost timer_boost;
++
+     controller->SendBegin();
+     controller->SetMode(GetRealModeValue());
+ 
+diff --git a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
+index 54e0b51d..2b94712f 100644
+--- a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
++++ b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
+@@ -380,25 +380,58 @@ bool MSIMysticLight761Controller::Update
+ {
+     int ret = 0;
+     bool flag = true;
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jaf.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++
++    auto send_packet = [this](FeaturePacket_PerLED_761& packet, const char* zone)
+     {
+-        flag = false;
++        const bool timing = LogManager::get()->getLoglevel() >= LL_VERBOSE;
++        std::chrono::steady_clock::time_point start;
++        if(timing)
++        {
++            start = std::chrono::steady_clock::now();
++        }
++        int result = hid_send_feature_report(dev, GET_CHAR_PTR_REF(packet), sizeof(packet));
++        if(timing)
++        {
++            LOG_VERBOSE("[ZoneTiming] %s %s start=%.3f duration=%.3f rgb=%06X result=%d",
++                        name.c_str(), zone,
++                        std::chrono::duration<double, std::milli>(start.time_since_epoch()).count(),
++                        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(),
++                        (unsigned int)ToRGBColor(packet.colors[0], packet.colors[1], packet.colors[2]), result);
++        }
++        return result;
++    };
++
++    if(HasPerLedData(MSI_ZONE_JAF))
++    {
++        ret = send_packet(data->jaf.packet, "JAF");
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb1.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++    if(HasPerLedData(MSI_ZONE_JARGB_1))
+     {
+-        flag = false;
++        ret = send_packet(data->jargb1.packet, "JARGB1");
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb2.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++    if(HasPerLedData(MSI_ZONE_JARGB_2))
+     {
+-        flag = false;
++        ret = send_packet(data->jargb2.packet, "JARGB2");
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb3.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++    if(HasPerLedData(MSI_ZONE_JARGB_3))
+     {
+-        flag = false;
++        ret = send_packet(data->jargb3.packet, "JARGB3");
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+ 
+     return flag;
+@@ -473,6 +506,60 @@ void MSIMysticLight761Controller::SetLedColor
+         set_data_color(ptr, candidate_index,     red);
+         set_data_color(ptr, candidate_index + 1, grn);
+         set_data_color(ptr, candidate_index + 2, blu);
++
++        switch(zone)
++        {
++        case MSI_ZONE_JAF:
++            jaf_per_led_data    = true;
++            break;
++        case MSI_ZONE_JARGB_1:
++            jargb1_per_led_data = true;
++            break;
++        case MSI_ZONE_JARGB_2:
++            jargb2_per_led_data = true;
++            break;
++        case MSI_ZONE_JARGB_3:
++            jargb3_per_led_data = true;
++            break;
++        default:
++            break;
++        }
++    }
++}
++
++bool MSIMysticLight761Controller::HasPerLedData
++    (
++    MSI_ZONE zone
++    )
++{
++    /*-----------------------------------------------------------------*\
++    | Whether this zone has ever been given per-LED colour data.        |
++    |                                                                   |
++    | Update() sends one 727-byte HID feature report per zone, and the  |
++    | board's lighting MCU is a low-speed USB device: a report costs    |
++    | about 93 ms regardless of how many LEDs the zone holds (measured  |
++    | unchanged with zones resized from 60 LEDs down to 4). Four of     |
++    | them is ~370 ms per frame, which not only makes the board trail   |
++    | every other device by a third of a second but starves the other   |
++    | HID devices sharing the bus -- a keyboard that updates in 33 ms   |
++    | on its own was measured at 800 ms while this ran alongside it.    |
++    |                                                                   |
++    | A header with nothing connected is sized to 0 LEDs in OpenRGB and |
++    | never reaches SetLedColor(), so its packet carries nothing and    |
++    | can be left out. Every skipped zone is ~93 ms off the frame time. |
++    \*-----------------------------------------------------------------*/
++    switch(zone)
++    {
++    case MSI_ZONE_JAF:
++        return jaf_per_led_data;
++    case MSI_ZONE_JARGB_1:
++        return jargb1_per_led_data;
++    case MSI_ZONE_JARGB_2:
++        return jargb2_per_led_data;
++    case MSI_ZONE_JARGB_3:
++        return jargb3_per_led_data;
++    default:
++        return true;
+     }
+ }
+ 
+diff --git a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h
+index c9eab05d..cb94461c 100644
+--- a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h
++++ b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h
+@@ -137,6 +137,19 @@ private:
+     std::string                                             version_ldrom;
+     FeaturePacket_761* data;
+ 
++    /*-----------------------------------------------------------------*\
++    | Set once a zone has actually been given per-LED colour data. A     |
++    | header with nothing plugged into it is sized to 0 LEDs in OpenRGB, |
++    | so it never reaches SetLedColor() and its packet can be skipped.   |
++    | See HasPerLedData() for why that matters.                          |
++    \*-----------------------------------------------------------------*/
++    bool            jaf_per_led_data    = false;
++    bool            jargb1_per_led_data = false;
++    bool            jargb2_per_led_data = false;
++    bool            jargb3_per_led_data = false;
++
++    bool            HasPerLedData(MSI_ZONE zone);
++
+     bool            ReadSettings();
+     bool            ReadFwVersion();
+     void            ReadName();
+diff --git a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp
+index ca9877f3..47c9ea9c 100644
+--- a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp
++++ b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.cpp
+@@ -10,6 +10,7 @@
+ \*---------------------------------------------------------*/
+ 
+ #include <cstring>
++#include <chrono>
+ #include "XPGSummonerController.h"
+ #include "StringUtils.h"
+ 
+@@ -20,22 +21,44 @@ XPGSummonerController::XPGSummonerController(hid_device *dev_handle, const char
+     name     = dev_name;
+     usb_pid  = pid;
+ 
++    has_frame     = false;
++    keepalive_run = true;
++    last_send     = std::chrono::steady_clock::now();
++    memset(last_frame, 0x00, sizeof(last_frame));
++
+     SendInitialize();
++
++    /*-----------------------------------------------------------------*\
++    | The Summoner's lighting reverts to OFF if it does not receive a   |
++    | color frame within ~2 s. Start a keep-alive thread that re-sends  |
++    | the last frame so static colors set from the GUI stay lit.        |
++    \*-----------------------------------------------------------------*/
++    keepalive_thread = std::thread(&XPGSummonerController::KeepAliveLoop, this);
+ }
+ 
+ XPGSummonerController::~XPGSummonerController()
+ {
++    {
++        std::lock_guard<std::mutex> lock(send_mutex);
++        keepalive_run = false;
++    }
++    keepalive_cv.notify_all();
++    if(keepalive_thread.joinable())
++    {
++        keepalive_thread.join();
++    }
+     hid_close(dev);
+ }
+ 
+ void XPGSummonerController::SendInitialize()
+ {
++    std::lock_guard<std::mutex> lock(send_mutex);
+     unsigned char init_buf[265] =
+     {
+         0x07, 0xEA, 0x00, 0x00,
+     };
+     memset(init_buf + 4, 0x00, 261);
+-    hid_write(dev, init_buf, 265);
++    hid_send_feature_report(dev, init_buf, 264);
+     std::this_thread::sleep_for(std::chrono::milliseconds(2));
+ }
+ 
+@@ -69,19 +92,73 @@ unsigned short XPGSummonerController::GetUSBPID()
+ 
+ void XPGSummonerController::SendColors(unsigned char *color_data, unsigned int color_data_size)
+ {
+-    const int leds_count     = 126;
+-    const int bytes_per_led  = 4;
+-    const int total_bytes    = leds_count * bytes_per_led;
+-    const int block_size     = 256;
+-    int zones                = 2;
++    std::lock_guard<std::mutex> lock(send_mutex);
++
++    /*-----------------------------------------------------------------*\
++    | Cache the frame so the keep-alive thread can re-send it.          |
++    \*-----------------------------------------------------------------*/
++    unsigned int copy = (color_data_size < (unsigned int)XPG_SUMMONER_FRAME_SIZE) ? color_data_size : (unsigned int)XPG_SUMMONER_FRAME_SIZE;
++    memcpy(last_frame, color_data, copy);
++    if(copy < (unsigned int)XPG_SUMMONER_FRAME_SIZE)
++    {
++        memset(last_frame + copy, 0x00, XPG_SUMMONER_FRAME_SIZE - copy);
++    }
++    has_frame = true;
++
++    SendFrameLocked();
++}
++
++void XPGSummonerController::SendFrameLocked()
++{
++    /*-----------------------------------------------------------------*\
++    | Split the cached 504-byte frame into the two feature packets.     |
++    | Caller must already hold send_mutex.                              |
++    \*-----------------------------------------------------------------*/
++    const int total_bytes = XPG_SUMMONER_FRAME_SIZE;
++    const int block_size  = 256;
++    const int zones       = 2;
+ 
+     for(int zone = 0; zone < zones; zone++)
+     {
+-        int offset      = zone * block_size;
+-        int remaining   = total_bytes - offset;
+-        color_data_size = (remaining > block_size) ? block_size : remaining;
++        int offset    = zone * block_size;
++        int remaining = total_bytes - offset;
++        int size      = (remaining > block_size) ? block_size : remaining;
+ 
+-        SendColorDataPacket(zone, &color_data[offset], color_data_size);
++        SendColorDataPacket((unsigned char)zone, &last_frame[offset], (unsigned int)size);
++    }
++
++    last_send = std::chrono::steady_clock::now();
++}
++
++void XPGSummonerController::KeepAliveLoop()
++{
++    std::unique_lock<std::mutex> lock(send_mutex);
++
++    while(keepalive_run)
++    {
++        /*-------------------------------------------------------------*\
++        | Re-send only after a full keep-alive period with no frame.    |
++        | While colours are streaming the keyboard never times out,     |
++        | and an extra 2 x 264-byte write would only compete with them  |
++        | for the USB bus it shares with the mouse and the motherboard. |
++        | The wait ends early on shutdown.                              |
++        \*-------------------------------------------------------------*/
++        if(keepalive_cv.wait_until(lock, last_send + XPG_SUMMONER_KEEPALIVE, [this]{ return(!keepalive_run); }))
++        {
++            break;
++        }
++
++        if(std::chrono::steady_clock::now() - last_send >= XPG_SUMMONER_KEEPALIVE)
++        {
++            if(has_frame)
++            {
++                SendFrameLocked();
++            }
++            else
++            {
++                last_send = std::chrono::steady_clock::now();
++            }
++        }
+     }
+ }
+ 
+@@ -101,7 +178,7 @@ unsigned int XPGSummonerController::SendColorDataPacket(
+     unsigned int copy_size = (color_size > 256) ? 256 : color_size;
+     memcpy(&packet[6], color_data, copy_size);
+ 
+-    hid_write(dev, packet, 265);
++    hid_send_feature_report(dev, packet, 264);
+ 
+     std::this_thread::sleep_for(std::chrono::milliseconds(2));
+     return copy_size;
+@@ -115,11 +192,12 @@ void XPGSummonerController::SendTerminateColorPacket()
+     | any active color effects on the |
+     | keyboard.                       |
+     \*-------------------------------*/
++    std::lock_guard<std::mutex> lock(send_mutex);
+     unsigned char terminate_buf[265] =
+     {
+         0x07, 0xEA, 0x00, 0x00,
+     };
+     memset(terminate_buf + 4, 0x00, 261);
+-    hid_write(dev, terminate_buf, 265);
++    hid_send_feature_report(dev, terminate_buf, 264);
+     std::this_thread::sleep_for(std::chrono::milliseconds(2));
+ }
+diff --git a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h
+index 59580afd..c8f2ebff 100644
+--- a/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h
++++ b/Controllers/XPGSummonerKeyboardController/XPGSummonerController.h
+@@ -12,6 +12,11 @@
+ #pragma once
+ 
+ #include <string>
++#include <thread>
++#include <mutex>
++#include <atomic>
++#include <chrono>
++#include <condition_variable>
+ #include "hidapi.h"
+ #include "RGBController.h"
+ 
+@@ -25,6 +30,17 @@
+ \*-----------------------------------------------------*/
+ #define XPG_SUMMONER_PID 0x9418
+ 
++/*-----------------------------------------------------*\
++| Number of bytes in a full color frame (126 LEDs x 4) |
++\*-----------------------------------------------------*/
++#define XPG_SUMMONER_FRAME_SIZE (126 * 4)
++
++/*-----------------------------------------------------*\
++| Re-send the last frame after this long without one;  |
++| the keyboard blanks after ~2 s                       |
++\*-----------------------------------------------------*/
++#define XPG_SUMMONER_KEEPALIVE  std::chrono::milliseconds(800)
++
+ enum
+ {
+     XPG_SUMMONER_MODE_OFF           =    0x00,
+@@ -66,4 +82,21 @@ private:
+     std::string location;
+     std::string name;
+     unsigned short usb_pid;
++
++    /*-----------------------------------------------------------------*\
++    | Keep-alive: the Summoner reverts to OFF if it does not receive a  |
++    | color frame within ~2 s, so a background thread re-sends the last |
++    | frame periodically to hold a static color (e.g. when set from the |
++    | OpenRGB GUI and left idle).                                       |
++    \*-----------------------------------------------------------------*/
++    unsigned char      last_frame[XPG_SUMMONER_FRAME_SIZE];
++    bool               has_frame;
++    std::mutex         send_mutex;
++    std::atomic<bool>  keepalive_run;
++    std::thread        keepalive_thread;
++    std::condition_variable               keepalive_cv;
++    std::chrono::steady_clock::time_point last_send;   /* guarded by send_mutex */
++
++    void SendFrameLocked();   /* sends last_frame as two feature packets; caller must hold send_mutex */
++    void KeepAliveLoop();
+ };
+diff --git a/LogManager.cpp b/LogManager.cpp
+index 8542e07c..20955604 100644
+--- a/LogManager.cpp
++++ b/LogManager.cpp
+@@ -22,9 +22,11 @@ const char* LogManager::log_codes[] = {"FATAL:", "ERROR:", "Warning:", "Info:",
+ const char* TimestampPattern = "%04d%02d%02d_%02d%02d%02d";
+ 
+ /*---------------------------------------------------------*\
+-| Relies on the structure of the template above             |
++| Relies on the structure of the template above; the        |
++| optional _N is the suffix configure() adds when two       |
++| instances start in the same second                        |
+ \*---------------------------------------------------------*/
+-const char* TimestampRegex = "[0-9]{8}_[0-9]{6}";
++const char* TimestampRegex = "[0-9]{8}_[0-9]{6}(_[0-9]+)?";
+ 
+ LogManager::LogManager()
+ {
+@@ -141,6 +143,22 @@ void LogManager::configure(json config, const filesystem::path& defaultDir)
+             }
+             filesystem::create_directories(p.parent_path());
+ 
++            /*---------------------------------------------*\
++            | Two instances started in the same second (a   |
++            | double-click launch hands over to the         |
++            | elevated task) would get the same name and    |
++            | write over each other; number the later one.  |
++            \*---------------------------------------------*/
++            if(oct != logname.npos)
++            {
++                for(int suffix = 2; filesystem::exists(p) && (suffix < 100); suffix++)
++                {
++                    std::string numbered = logtempl;
++                    numbered.replace(oct, 1, std::string(time_string) + "_" + std::to_string(suffix));
++                    p = p.parent_path() / filesystem::u8path(numbered).filename();
++                }
++            }
++
+             /*---------------------------------------------*\
+             | "Log rotation": remove old log files          |
+             | exceeding the current configured limit        |
+@@ -485,12 +503,18 @@ void LogManager::rotate_logs(const filesystem::path& folder, const filesystem::p
+     | the one we're about to create for max_count <= 0 and  |
+     | to prevent any possible errors in the above logic     |
+     \*-----------------------------------------------------*/
+-    size_t remove_count = valid_paths.size() - max_count + 1;
+-    if(remove_count > valid_paths.size())
++    /*-----------------------------------------------------*\
++    | Nothing to remove while under the limit. Without this |
++    | check the size_t subtraction below wrapped around and |
++    | the clamp then deleted every log file.                |
++    \*-----------------------------------------------------*/
++    if(valid_paths.size() < (size_t)max_count)
+     {
+-        remove_count = valid_paths.size();
++        return;
+     }
+ 
++    size_t remove_count = valid_paths.size() - max_count + 1;
++
+     for(size_t i = 0; i < remove_count; ++i)
+     {
+         /*-------------------------------------------------*\
+diff --git a/NetworkServer.cpp b/NetworkServer.cpp
+index 8d9f0eb7..c3088161 100644
+--- a/NetworkServer.cpp
++++ b/NetworkServer.cpp
+@@ -579,49 +579,44 @@ void NetworkServer::ListenThreadFunction(NetworkClientInfo * client_info)
+         int             bytes_read  = 0;
+         char *          data        = NULL;
+ 
+-        for(unsigned int i = 0; i < 4; i++)
+-        {
+-            /*---------------------------------------------------------*\
+-            | Read byte of magic                                        |
+-            \*---------------------------------------------------------*/
+-            bytes_read = recv_select(client_sock, &header.pkt_magic[i], 1, 0);
+-
+-            if(bytes_read <= 0)
+-            {
+-                LOG_ERROR("[NetworkServer] recv_select failed receiving magic, closing listener");
+-                goto listen_done;
+-            }
+-
+-            /*---------------------------------------------------------*\
+-            | Test characters of magic "ORGB"                           |
+-            \*---------------------------------------------------------*/
+-            if(header.pkt_magic[i] != openrgb_sdk_magic[i])
+-            {
+-                LOG_ERROR("[NetworkServer] Invalid magic received");
+-                continue;
+-            }
+-        }
+-
+         /*---------------------------------------------------------*\
+-        | If we get to this point, the magic is correct.  Read the  |
+-        | rest of the header                                        |
++        | Read the whole header, magic included, in as few recv()   |
++        | calls as the stream allows. Upstream read the magic one   |
++        | byte at a time, a select() and a recv() per byte, for     |
++        | every packet.                                             |
+         \*---------------------------------------------------------*/
+         bytes_read = 0;
+         do
+         {
+             int tmp_bytes_read = 0;
+ 
+-            tmp_bytes_read = recv_select(client_sock, (char *)&header.pkt_dev_idx + bytes_read, sizeof(header) - sizeof(header.pkt_magic) - bytes_read, 0);
+-
+-            bytes_read += tmp_bytes_read;
++            tmp_bytes_read = recv_select(client_sock, (char *)&header + bytes_read, sizeof(header) - bytes_read, 0);
+ 
+             if(tmp_bytes_read <= 0)
+             {
+-                LOG_ERROR("[NetworkServer] recv_select failed receiving header, closing listener");
++                if(bytes_read < (int)sizeof(header.pkt_magic))
++                {
++                    LOG_ERROR("[NetworkServer] recv_select failed receiving magic, closing listener");
++                }
++                else
++                {
++                    LOG_ERROR("[NetworkServer] recv_select failed receiving header, closing listener");
++                }
+                 goto listen_done;
+             }
+ 
+-        } while(bytes_read != sizeof(header) - sizeof(header.pkt_magic));
++            bytes_read += tmp_bytes_read;
++
++        } while(bytes_read != sizeof(header));
++
++        /*---------------------------------------------------------*\
++        | Test characters of magic "ORGB". As before, a bad magic   |
++        | is logged and the packet is still processed.              |
++        \*---------------------------------------------------------*/
++        if(memcmp(header.pkt_magic, openrgb_sdk_magic, sizeof(header.pkt_magic)) != 0)
++        {
++            LOG_ERROR("[NetworkServer] Invalid magic received");
++        }
+ 
+         /*---------------------------------------------------------*\
+         | Header received, now receive the data                     |
+diff --git a/OpenRGB.pro b/OpenRGB.pro
+index 8e68a856..c3e147bd 100644
+--- a/OpenRGB.pro
++++ b/OpenRGB.pro
+@@ -17,9 +17,12 @@ QT +=
+ CONFIG +=   c++17                                                                               \
+             lrelease                                                                            \
+             embed_translations                                                                  \
+-            silent                                                                              \
+ 
+ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
++# Force 64-bit arch selection (qmake did not auto-detect QMAKE_TARGET.arch here),
++# so the win32 x86_64 SOURCES/LIBS block is actually included.
++QMAKE_TARGET.arch = x86_64
++
+ 
+ #-----------------------------------------------------------------------------------------------#
+ # Application Configuration                                                                     #
+@@ -325,7 +328,7 @@ TRANSLATIONS +=
+ #-----------------------------------------------------------------------------------------------#
+ # Windows-specific Configuration                                                                #
+ #-----------------------------------------------------------------------------------------------#
+-win32:QMAKE_CXXFLAGS += /utf-8
++win32-msvc:QMAKE_CXXFLAGS += /utf-8
+ win32:INCLUDEPATH +=                                                                            \
+     dependencies/display-library/include                                                        \
+     dependencies/hidapi-win/include                                                             \
+@@ -373,9 +376,10 @@ win32:contains(QMAKE_TARGET.arch, x86_64) {
+     LIBS +=                                                                                     \
+         -lws2_32                                                                                \
+         -liphlpapi                                                                              \
+-        -L"$$PWD/dependencies/libusb-1.0.27/VS2019/MS64/dll" -llibusb-1.0                       \
+-        -L"$$PWD/dependencies/hidapi-win/x64/" -lhidapi                                         \
+-        -L"$$PWD/dependencies/mbedtls-3.2.1/lib/x64/" -lmbedcrypto -lmbedtls -lmbedx509         \
++        -luuid -lole32 -loleaut32 -lwbemuuid -lsetupapi -lcfgmgr32 \
++        -lusb-1.0                       \
++        -lhidapi                                         \
++        -lmbedcrypto -lmbedtls -lmbedx509         \
+         -L"$$PWD/dependencies/PawnIO/" -lPawnIOLib                                              \
+ }
+ 
+diff --git a/RGBController/RGBController.cpp b/RGBController/RGBController.cpp
+index b1bfd6b8..bd1c2beb 100644
+--- a/RGBController/RGBController.cpp
++++ b/RGBController/RGBController.cpp
+@@ -12,6 +12,7 @@
+ 
+ #include <cstring>
+ #include "RGBController.h"
++#include "LogManager.h"
+ 
+ using namespace std::chrono_literals;
+ 
+@@ -59,6 +60,8 @@ zone::~zone()
+ RGBController::RGBController()
+ {
+     flags       = 0;
++    CallFlag_UpdateLEDs = false;
++    CallFlag_UpdateMode = false;
+     DeviceThreadRunning = true;
+     DeviceCallThread = new std::thread(&RGBController::DeviceCallThreadFunction, this);
+ }
+@@ -66,6 +69,7 @@ RGBController::RGBController()
+ RGBController::~RGBController()
+ {
+     DeviceThreadRunning = false;
++    WakeDeviceCallThread();
+     DeviceCallThread->join();
+     delete DeviceCallThread;
+ 
+@@ -2051,6 +2055,7 @@ void RGBController::SignalUpdate()
+ void RGBController::UpdateLEDs()
+ {
+     CallFlag_UpdateLEDs = true;
++    WakeDeviceCallThread();
+ 
+     SignalUpdate();
+ }
+@@ -2058,6 +2063,19 @@ void RGBController::UpdateLEDs()
+ void RGBController::UpdateMode()
+ {
+     CallFlag_UpdateMode = true;
++    WakeDeviceCallThread();
++}
++
++void RGBController::WakeDeviceCallThread()
++{
++    /*-----------------------------------------------------*\
++    | Taking the mutex orders this wakeup after the device  |
++    | thread's predicate check, so it cannot be missed      |
++    \*-----------------------------------------------------*/
++    {
++        std::lock_guard<std::mutex> lock(DeviceCallMutex);
++    }
++    DeviceCallCV.notify_one();
+ }
+ 
+ void RGBController::SaveMode()
+@@ -2110,41 +2128,107 @@ void RGBController::DeviceUpdateMode()
+ 
+ void RGBController::DeviceCallThreadFunction()
+ {
+-    CallFlag_UpdateLEDs = false;
+-    CallFlag_UpdateMode = false;
++    /*-----------------------------------------------------------------*\
++    | Update timing instrumentation                                     |
++    |                                                                   |
++    | UpdateLEDs() from a client only raises a flag, so an SDK client   |
++    | cannot see how long a device really takes to push a frame to the  |
++    | hardware -- which is what decides whether devices change colour   |
++    | together or seconds apart. When the log level is verbose or       |
++    | higher, time DeviceUpdateLEDs() and log a summary every           |
++    | UPDATE_TIMING_WINDOW frames. At the default log level this costs  |
++    | one bool test per loop iteration.                                 |
++    \*-----------------------------------------------------------------*/
++    const unsigned int UPDATE_TIMING_WINDOW = 100;
++
++    const bool   timing_enabled = (LogManager::get()->getLoglevel() >= LL_VERBOSE);
++    unsigned int timing_count   = 0;
++    double       timing_sum     = 0.0;
++    double       timing_min     = 0.0;
++    double       timing_max     = 0.0;
+ 
+     while(DeviceThreadRunning.load() == true)
+     {
+-        if(CallFlag_UpdateMode.load() == true)
++        /*-------------------------------------------------------------*\
++        | Sleep until there is work or the controller is going away.    |
++        | This used to poll the flags every 1 ms, which with four      |
++        | devices was ~4000 wakeups per second doing nothing.           |
++        \*-------------------------------------------------------------*/
+         {
+-            if(flags & CONTROLLER_FLAG_RESET_BEFORE_UPDATE)
+-            {
+-                CallFlag_UpdateMode = false;
+-                DeviceUpdateMode();
+-            }
+-            else
++            std::unique_lock<std::mutex> lock(DeviceCallMutex);
++
++            DeviceCallCV.wait(lock, [this]
+             {
+-                DeviceUpdateMode();
+-                CallFlag_UpdateMode = false;
+-            }
++                return((DeviceThreadRunning.load() == false)
++                    || (CallFlag_UpdateMode.load() == true)
++                    || (CallFlag_UpdateLEDs.load() == true));
++            });
+         }
+-        if(CallFlag_UpdateLEDs.load() == true)
++
++        if(DeviceThreadRunning.load() == false)
++        {
++            break;
++        }
++
++        /*-------------------------------------------------------------*\
++        | Clear each flag before acting on it, so a request that        |
++        | arrives while the hardware is being written gets its own      |
++        | pass instead of being cleared along with the one in progress  |
++        | -- otherwise the last colour of a burst could be dropped and  |
++        | a slow device would sit on a stale colour.                    |
++        \*-------------------------------------------------------------*/
++        if(CallFlag_UpdateMode.exchange(false) == true)
++        {
++            DeviceUpdateMode();
++        }
++        if(CallFlag_UpdateLEDs.exchange(false) == true)
+         {
+-            if(flags & CONTROLLER_FLAG_RESET_BEFORE_UPDATE)
++            std::chrono::steady_clock::time_point update_start;
++            RGBColor timing_color = 0;
++
++            if(timing_enabled)
+             {
+-                CallFlag_UpdateLEDs = false;
+-                DeviceUpdateLEDs();
++                update_start = std::chrono::steady_clock::now();
++                timing_color = colors.empty() ? 0 : colors.front();
+             }
+-            else
++
++            DeviceUpdateLEDs();
++
++            if(timing_enabled)
+             {
+-                DeviceUpdateLEDs();
+-                CallFlag_UpdateLEDs = false;
++                double elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - update_start).count();
++                LOG_VERBOSE("[FrameTiming] %s start=%.3f duration=%.3f rgb=%06X end_rgb=%06X",
++                            name.c_str(),
++                            std::chrono::duration<double, std::milli>(update_start.time_since_epoch()).count(),
++                            elapsed, (unsigned int)timing_color,
++                            (unsigned int)(colors.empty() ? 0 : colors.front()));
++
++                if((timing_count == 0) || (elapsed < timing_min))
++                {
++                    timing_min = elapsed;
++                }
++
++                if(elapsed > timing_max)
++                {
++                    timing_max = elapsed;
++                }
++
++                timing_sum += elapsed;
++                timing_count++;
++
++                if(timing_count >= UPDATE_TIMING_WINDOW)
++                {
++                    LOG_VERBOSE("[UpdateTiming] %s: n=%u avg=%.2f ms min=%.2f ms max=%.2f ms",
++                                name.c_str(), timing_count,
++                                timing_sum / timing_count, timing_min, timing_max);
++
++                    timing_count = 0;
++                    timing_sum   = 0.0;
++                    timing_min   = 0.0;
++                    timing_max   = 0.0;
++                }
+             }
+         }
+-        else
+-        {
+-           std::this_thread::sleep_for(1ms);
+-        }
+     }
+ }
+ 
+diff --git a/RGBController/RGBController.h b/RGBController/RGBController.h
+index 364adca0..c3b4b31d 100644
+--- a/RGBController/RGBController.h
++++ b/RGBController/RGBController.h
+@@ -18,6 +18,7 @@
+ #include <thread>
+ #include <chrono>
+ #include <mutex>
++#include <condition_variable>
+ 
+ /*------------------------------------------------------------------*\
+ | RGB Color Type and Conversion Macros                               |
+@@ -419,6 +420,14 @@ private:
+     std::atomic<bool>       CallFlag_UpdateLEDs;
+     std::atomic<bool>       CallFlag_UpdateMode;
+     std::atomic<bool>       DeviceThreadRunning;
++
++    /*-----------------------------------------------------*\
++    | The device thread sleeps on this instead of polling   |
++    | the call flags every millisecond                      |
++    \*-----------------------------------------------------*/
++    std::mutex              DeviceCallMutex;
++    std::condition_variable DeviceCallCV;
++    void                    WakeDeviceCallThread();
+     //bool                    CallFlag_UpdateZoneLEDs                     = false;
+     //bool                    CallFlag_UpdateSingleLED                    = false;
+     //bool                    CallFlag_UpdateMode                         = false;
+diff --git a/ResourceManager.cpp b/ResourceManager.cpp
+index 5e97dff0..146ed75b 100644
+--- a/ResourceManager.cpp
++++ b/ResourceManager.cpp
+@@ -12,6 +12,9 @@
+ \*---------------------------------------------------------*/
+ 
+ #ifdef _WIN32
++#ifdef _WIN32
++#include <windows.h>
++#endif
+ #include <codecvt>
+ #include <locale>
+ #endif
+@@ -636,6 +639,31 @@ void ResourceManager::SetupConfigurationDirectory()
+ {
+     config_dir.clear();
+ #ifdef _WIN32
++    /*-----------------------------------------------------*\
++    | Portable build: keep settings, profiles, logs and     |
++    | plugins in a "config" folder next to OpenRGB.exe, so  |
++    | the whole install moves or copies as one folder and   |
++    | nothing is written to %APPDATA%. Fall back to         |
++    | %APPDATA% only if that folder cannot be created.      |
++    | --config and --localconfig still override this.       |
++    \*-----------------------------------------------------*/
++    wchar_t exe_path[MAX_PATH];
++    DWORD   exe_path_len = GetModuleFileNameW(NULL, exe_path, MAX_PATH);
++
++    if((exe_path_len > 0) && (exe_path_len < MAX_PATH))
++    {
++        filesystem::path portable_dir = filesystem::path(std::wstring(exe_path, exe_path_len)).parent_path() / "config";
++        std::error_code  ec;
++
++        filesystem::create_directories(portable_dir, ec);
++
++        if(filesystem::is_directory(portable_dir, ec))
++        {
++            config_dir = portable_dir;
++            return;
++        }
++    }
++
+     const wchar_t* appdata = _wgetenv(L"APPDATA");
+     if(appdata != NULL)
+     {
+diff --git a/dependencies/httplib/httplib.h b/dependencies/httplib/httplib.h
+index 062f66b8..d1f77781 100644
+--- a/dependencies/httplib/httplib.h
++++ b/dependencies/httplib/httplib.h
+@@ -2819,8 +2819,8 @@ inline bool mmap::open(const char *path) {
+     wpath += path[i];
+   }
+ 
+-  hFile_ = ::CreateFile2(wpath.c_str(), GENERIC_READ, FILE_SHARE_READ,
+-                         OPEN_EXISTING, NULL);
++  hFile_ = ::CreateFileW(wpath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
++                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+ 
+   if (hFile_ == INVALID_HANDLE_VALUE) { return false; }
+ 
+@@ -2829,14 +2829,14 @@ inline bool mmap::open(const char *path) {
+   size_ = static_cast<size_t>(size.QuadPart);
+ 
+   hMapping_ =
+-      ::CreateFileMappingFromApp(hFile_, NULL, PAGE_READONLY, size_, NULL);
++      ::CreateFileMappingW(hFile_, NULL, PAGE_READONLY, 0, 0, NULL);
+ 
+   if (hMapping_ == NULL) {
+     close();
+     return false;
+   }
+ 
+-  addr_ = ::MapViewOfFileFromApp(hMapping_, FILE_MAP_READ, 0, 0);
++  addr_ = ::MapViewOfFile(hMapping_, FILE_MAP_READ, 0, 0, 0);
+ #else
+   fd_ = ::open(path, O_RDONLY);
+   if (fd_ == -1) { return false; }
+diff --git a/dependencies/hueplusplus-1.2.0/src/TimePattern.cpp b/dependencies/hueplusplus-1.2.0/src/TimePattern.cpp
+index 16ea8e4b..dc86af69 100644
+--- a/dependencies/hueplusplus-1.2.0/src/TimePattern.cpp
++++ b/dependencies/hueplusplus-1.2.0/src/TimePattern.cpp
+@@ -90,7 +90,7 @@ system_clock::time_point parseTimestamp(const std::string& timestamp)
+ std::chrono::system_clock::time_point parseUTCTimestamp(const std::string& timestamp)
+ {
+     std::tm tm = timestampToTm(timestamp);
+-#ifdef _MSC_VER
++#if defined(_MSC_VER) || defined(__MINGW32__)
+     std::time_t ctime = _mkgmtime(&tm);
+ #else
+     // Non-standard, but POSIX compliant
+diff --git a/i2c_smbus/Windows/i2c_smbus_amdadl.cpp b/i2c_smbus/Windows/i2c_smbus_amdadl.cpp
+index e35c373c..ae6da7c7 100644
+--- a/i2c_smbus/Windows/i2c_smbus_amdadl.cpp
++++ b/i2c_smbus/Windows/i2c_smbus_amdadl.cpp
+@@ -13,6 +13,8 @@
+ #include "Detector.h"
+ #include "i2c_smbus_amdadl.h"
+ #include "LogManager.h"
++#include "ResourceManager.h"
++#include "SettingsManager.h"
+ #include "pci_ids.h"
+ 
+ typedef int ( *ADL2_MAIN_CONTROL_CREATE )(ADL_MAIN_MALLOC_CALLBACK, int, ADL_CONTEXT_HANDLE*);
+@@ -266,6 +268,20 @@ bool i2c_smbus_amdadl_detect()
+ {
+     ADL_CONTEXT_HANDLE context;
+ 
++    /*-----------------------------------------------------*\
++    | Opening ADL costs ~1.4 s at startup and keeps the AMD |
++    | display library loaded for the life of the process.   |
++    | Allow skipping it on systems with no RGB on the GPU   |
++    | with "Drivers": { "amd_adl_i2c": false }.             |
++    \*-----------------------------------------------------*/
++    json drivers_settings = ResourceManager::get()->GetSettingsManager()->GetSettings("Drivers");
++
++    if(drivers_settings.contains("amd_adl_i2c") && (drivers_settings["amd_adl_i2c"] == false))
++    {
++        LOG_INFO("[AMD ADL] GPU I2C disabled in settings, skipping");
++        return(true);
++    }
++
+     if(ADL_OK == LoadLibraries())
+     {
+         if (ADL_OK != ADL2_Main_Control_Create(::ADL_Main_Memory_Alloc, 1, &context))
+diff --git a/qt/OpenRGBDevicePage/OpenRGBDevicePage.cpp b/qt/OpenRGBDevicePage/OpenRGBDevicePage.cpp
+index d8fc7906..8b78aae0 100644
+--- a/qt/OpenRGBDevicePage/OpenRGBDevicePage.cpp
++++ b/qt/OpenRGBDevicePage/OpenRGBDevicePage.cpp
+@@ -17,7 +17,34 @@ static void UpdateCallback(void * this_ptr)
+ {
+     OpenRGBDevicePage * this_obj = (OpenRGBDevicePage *)this_ptr;
+ 
+-    QMetaObject::invokeMethod(this_obj, "UpdateInterface", Qt::QueuedConnection);
++    this_obj->QueueInterfaceUpdate();
++}
++
++void OpenRGBDevicePage::QueueInterfaceUpdate()
++{
++    /*-----------------------------------------------------*\
++    | Called from whichever thread updated the LEDs, once   |
++    | per frame. A hidden page has nothing to repaint, and  |
++    | the LED view reads the current colours when it        |
++    | paints, so keep at most one repaint queued instead of |
++    | waking the GUI thread for every frame.                |
++    \*-----------------------------------------------------*/
++    if(PageVisible.load() && !UpdatePending.exchange(true))
++    {
++        QMetaObject::invokeMethod(this, "UpdateInterface", Qt::QueuedConnection);
++    }
++}
++
++void OpenRGBDevicePage::showEvent(QShowEvent *event)
++{
++    PageVisible = true;
++    QFrame::showEvent(event);
++}
++
++void OpenRGBDevicePage::hideEvent(QHideEvent *event)
++{
++    PageVisible = false;
++    QFrame::hideEvent(event);
+ }
+ 
+ QString OpenRGBDevicePage::ModeDescription(const mode& m)
+@@ -698,6 +725,7 @@ void OpenRGBDevicePage::on_DirectionBox_currentIndexChanged(int /*index*/)
+ 
+ void OpenRGBDevicePage::UpdateInterface()
+ {
++    UpdatePending = false;
+     //UpdateModeUi();
+     ui->DeviceViewBox->repaint();
+ }
+diff --git a/qt/OpenRGBDevicePage/OpenRGBDevicePage.h b/qt/OpenRGBDevicePage/OpenRGBDevicePage.h
+index f958badb..a8e5258d 100644
+--- a/qt/OpenRGBDevicePage/OpenRGBDevicePage.h
++++ b/qt/OpenRGBDevicePage/OpenRGBDevicePage.h
+@@ -10,6 +10,7 @@
+ #pragma once
+ 
+ #include <QFrame>
++#include <atomic>
+ #include "RGBController.h"
+ 
+ namespace Ui
+@@ -35,6 +36,12 @@ public:
+     void ShowDeviceView();
+     void HideDeviceView();
+ 
++    void QueueInterfaceUpdate();
++
++protected:
++    void showEvent(QShowEvent *event) override;
++    void hideEvent(QHideEvent *event) override;
++
+ private slots:
+     void changeEvent(QEvent *event);
+     void UpdateInterface();
+@@ -81,6 +88,9 @@ private:
+ 
+     QColor current_color;
+ 
++    std::atomic<bool> PageVisible   {false};
++    std::atomic<bool> UpdatePending {false};
++
+     bool autoUpdateEnabled();
+     void colorChanged();
+     void getSelectedZone(bool * selected_all_zones, int * selected_zone, int * selected_segment);
+diff --git a/startup/main_Windows.cpp b/startup/main_Windows.cpp
+index a7560a91..6b44269b 100644
+--- a/startup/main_Windows.cpp
++++ b/startup/main_Windows.cpp
+@@ -9,6 +9,12 @@
+ |   SPDX-License-Identifier: GPL-2.0-or-later               |
+ \*---------------------------------------------------------*/
+ 
++#ifndef _WIN32_WINNT
++#define _WIN32_WINNT 0x0A00
++#endif
++#ifndef WINVER
++#define WINVER 0x0A00
++#endif
+ #include <algorithm>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -24,6 +30,10 @@
+ #include "ResourceManager.h"
+ #include "StringUtils.h"
+ 
++#include <vector>
++#include <shellapi.h>
++#include <iphlpapi.h>
++
+ using namespace std::chrono_literals;
+ 
+ static int common_main(int argc, char* argv[]);
+@@ -453,14 +463,23 @@ int main(int argc, char* argv[])
+ }
+ 
+ /*---------------------------------------------------------*\
+-| InitializeTimerResolutionThreadFunction (Win32)           |
++| InitializeTimerResolution (Win32)                         |
+ |                                                           |
+ |   On Windows, the default timer resolution is 15.6ms.     |
+ |   For higher accuracy delays, the timer resolution should |
+-|   be set to a shorter interval.  The shortest interval    |
+-|   that can be set is 0.5ms.                               |
++|   be set to a shorter interval.                           |
++|                                                           |
++|   1 ms is what the drivers' short sleeps need (e.g. the   |
++|   2 ms gap between XPG Summoner packets). Upstream asked  |
++|   for 0.5 ms from a thread that re-requested it every     |
++|   500 ms forever; the request lasts for the life of the   |
++|   process, and 0.5 ms doubles the timer interrupt rate of |
++|   the whole system, so ask once for 1 ms instead. The     |
++|   Kingston Fury driver, whose SMBus writes are paced by   |
++|   the tick, raises it to 0.5 ms only while it writes a    |
++|   frame (KingstonFuryTimerBoost).                         |
+ \*---------------------------------------------------------*/
+-void InitializeTimerResolutionThreadFunction()
++void InitializeTimerResolution()
+ {
+     /*-----------------------------------------------------*\
+     | NtSetTimerResolution function pointer type            |
+@@ -492,14 +511,176 @@ void InitializeTimerResolutionThreadFunction()
+ 
+     /*-----------------------------------------------------*\
+     | Call NtSetTimerResolution to set timer resolution to  |
+-    | 0.5ms every 500ms                                     |
++    | 1ms (units of 100ns)                                  |
++    \*-----------------------------------------------------*/
++    if(NtSetTimerResolution != NULL)
++    {
++        NtSetTimerResolution(10000, TRUE, &CurrentResolution);
++    }
++}
++
++/*---------------------------------------------------------*\
++| Elevated server hand-off (Win32)                          |
++|                                                           |
++|   The RGB RAM sits on SMBus, which PawnIO opens only for  |
++|   an elevated process. The elevated instance is the one   |
++|   the "OpenRGB (elevated)" logon task starts with         |
++|   --server. Double-clicking OpenRGB.exe gives a non-      |
++|   elevated process, and if that server is not running it  |
++|   detects the devices itself: it comes up without the RAM |
++|   and holds the HID devices so a proper instance can't.   |
++|                                                           |
++|   So a plain non-elevated GUI launch first makes sure the |
++|   elevated server is up -- by running the task, or, if    |
++|   there is no task, by relaunching itself elevated -- and |
++|   then attaches to it through the usual local auto-       |
++|   connect, which shows every device including the RAM.    |
++\*---------------------------------------------------------*/
++#define ELEVATED_SERVER_TASK_NAME   L"OpenRGB (elevated)"
++
++static bool IsProcessElevated()
++{
++    HANDLE          token;
++    TOKEN_ELEVATION elevation   = { 0 };
++    DWORD           size        = 0;
++
++    if(!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
++    {
++        return(false);
++    }
++
++    GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size);
++    CloseHandle(token);
++
++    return(elevation.TokenIsElevated != 0);
++}
++
++static bool IsLocalServerListening(unsigned short port)
++{
++    /*-----------------------------------------------------*\
++    | Look the port up in the listener table rather than    |
++    | probing it: a refused connect to localhost takes ~2 s |
++    | on Windows, and a successful one is logged by the     |
++    | server as a dropped client.                           |
+     \*-----------------------------------------------------*/
+-    while(1)
++    ULONG                       size    = 0;
++    std::vector<unsigned char>  buffer;
++
++    GetExtendedTcpTable(NULL, &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
++    buffer.resize(size + 1024);
++    size = (ULONG)buffer.size();
++
++    if(GetExtendedTcpTable(buffer.data(), &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0) != NO_ERROR)
+     {
+-        NtSetTimerResolution(5000, TRUE, &CurrentResolution);
++        return(false);
++    }
+ 
+-        std::this_thread::sleep_for(500ms);
++    MIB_TCPTABLE_OWNER_PID* table = (MIB_TCPTABLE_OWNER_PID*)buffer.data();
++
++    for(DWORD row_idx = 0; row_idx < table->dwNumEntries; row_idx++)
++    {
++        if(ntohs((u_short)table->table[row_idx].dwLocalPort) == port)
++        {
++            return(true);
++        }
+     }
++
++    return(false);
++}
++
++static bool RunElevatedServerTask()
++{
++    wchar_t system_dir[MAX_PATH];
++
++    if(GetSystemDirectoryW(system_dir, MAX_PATH) == 0)
++    {
++        return(false);
++    }
++
++    std::wstring command = L"\"" + std::wstring(system_dir) + L"\\schtasks.exe\" /run /tn \"" ELEVATED_SERVER_TASK_NAME L"\"";
++
++    STARTUPINFOW        startup_info = { };
++    PROCESS_INFORMATION process_info = { };
++    DWORD               exit_code    = 1;
++
++    startup_info.cb = sizeof(startup_info);
++
++    if(!CreateProcessW(NULL, &command[0], NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &startup_info, &process_info))
++    {
++        return(false);
++    }
++
++    if(WaitForSingleObject(process_info.hProcess, 10000) == WAIT_OBJECT_0)
++    {
++        GetExitCodeProcess(process_info.hProcess, &exit_code);
++    }
++
++    CloseHandle(process_info.hThread);
++    CloseHandle(process_info.hProcess);
++
++    return(exit_code == 0);
++}
++
++static bool RelaunchElevated()
++{
++    wchar_t exe_path[MAX_PATH];
++
++    if(GetModuleFileNameW(NULL, exe_path, MAX_PATH) == 0)
++    {
++        return(false);
++    }
++
++    /*-----------------------------------------------------*\
++    | Also serve the SDK, so the elevated instance can be   |
++    | the one everything else (Ambilight) talks to          |
++    \*-----------------------------------------------------*/
++    SHELLEXECUTEINFOW exec_info = { };
++
++    exec_info.cbSize       = sizeof(exec_info);
++    exec_info.lpVerb       = L"runas";
++    exec_info.lpFile       = exe_path;
++    exec_info.lpParameters = L"--gui --server";
++    exec_info.nShow        = SW_SHOWNORMAL;
++
++    return(ShellExecuteExW(&exec_info) == TRUE);
++}
++
++static void EnsureElevatedServer()
++{
++    if(IsLocalServerListening(OPENRGB_SDK_PORT))
++    {
++        return;
++    }
++
++    if(RunElevatedServerTask())
++    {
++        LOG_INFO("[main] Not elevated, started task \"OpenRGB (elevated)\" and attaching to it as a client");
++
++        for(int wait_idx = 0; wait_idx < 150; wait_idx++)
++        {
++            if(IsLocalServerListening(OPENRGB_SDK_PORT))
++            {
++                return;
++            }
++
++            std::this_thread::sleep_for(100ms);
++        }
++
++        LOG_WARNING("[main] Task \"OpenRGB (elevated)\" did not start a server, continuing without elevation");
++        return;
++    }
++
++    /*-----------------------------------------------------*\
++    | No task (e.g. the folder was moved and                |
++    | register-autostart.ps1 not run again): ask for UAC.   |
++    | If that is declined, carry on unelevated as before.   |
++    \*-----------------------------------------------------*/
++    if(RelaunchElevated())
++    {
++        exit(0);
++    }
++
++    LOG_WARNING("[main] Not elevated and could not elevate, SMBus devices (RGB RAM) will be missing");
+ }
+ 
+ /*---------------------------------------------------------*\
+@@ -563,14 +744,24 @@ static int common_main(int argc, char* argv[])
+         | return flags                                      |
+         \*-------------------------------------------------*/
+         ret_flags = cli_pre_detection(argc, argv);
++
++        /*-------------------------------------------------*\
++        | A plain double-click launch without admin rights: |
++        | attach to the elevated server instead of running  |
++        | detection unelevated                              |
++        \*-------------------------------------------------*/
++        if((ret_flags & RET_FLAG_START_GUI)
++        && !(ret_flags & RET_FLAG_NO_AUTO_CONNECT)
++        && !IsProcessElevated())
++        {
++            EnsureElevatedServer();
++        }
+     }
+ 
+     /*-----------------------------------------------------*\
+-    | Start timer resolution correction thread              |
++    | Raise timer resolution for the driver delays          |
+     \*-----------------------------------------------------*/
+-    std::thread * InitializeTimerResolutionThread;
+-    InitializeTimerResolutionThread = new std::thread(InitializeTimerResolutionThreadFunction);
+-    InitializeTimerResolutionThread->detach();
++    InitializeTimerResolution();
+ 
+     /*-----------------------------------------------------*\
+     | Initialize ResourceManager                            |

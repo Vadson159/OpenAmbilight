@@ -7,6 +7,18 @@ Sync PC RGB with screen colors using OpenRGB.
 ## What it does
 Captures the dominant color from your monitor and sends it to all RGB devices through OpenRGB. It works with RAM, fans, strips, motherboard LEDs, and any other device supported by OpenRGB.
 
+## Device synchronization
+
+The current single-file app is `Ambilight.pyw`. **Sync all devices** is enabled
+by default: every device receives the same sampled frames, scheduled using
+measured hardware delays. The shared update rate follows the slowest device
+(about 3.6 FPS on this PC), independently of the screen capture FPS. Separate
+MSI ARGB headers are written sequentially; other devices align between them.
+`python Ambilight.pyw --cli --no-sync` restores independent updates.
+
+Measurements, remaining hardware limits, and reproduction steps:
+[synchronization report](diagnostics/sync-2026-10-23/REPORT.md).
+
 ## Requirements
 * **OS**: Windows 10/11
 * **Python**: 3.10+ ([python.org](https://www.python.org/))
@@ -20,29 +32,32 @@ Captures the dominant color from your monitor and sends it to all RGB devices th
    * Go to the **SDK Server** tab and click **Start Server**.
 4. Test the device listing:
    ```bash
-   python ambilight.py --list
+   python Ambilight.pyw --list
    ```
    You should see your devices listed.
 5. Test color cycles:
    ```bash
-   python ambilight.py --test
+   python Ambilight.pyw --test
    ```
    Colors should cycle on your devices.
 6. Run Ambilight:
+   Double-click `Ambilight.pyw` to open the GUI, or run headless CLI mode:
    ```bash
-   python ambilight.py
+   python Ambilight.pyw --cli
    ```
 
 ## Usage
 ```bash
-python ambilight.py                # default 15 FPS
-python ambilight.py --fps 30       # faster updates
-python ambilight.py --monitor 2    # specific monitor
-python ambilight.py --width 1920   # monitor width hint
-python ambilight.py --brightness 70  # cap brightness at 70%
-python ambilight.py --test         # test colors
-python ambilight.py --list         # list devices
-python ambilight.py --restore      # reset devices to default mode
+Ambilight.pyw                        # open GUI (or double-click)
+python Ambilight.pyw --cli           # headless mode (default 60 FPS)
+python Ambilight.pyw --fps 30        # custom capture FPS
+python Ambilight.pyw --monitor 2     # specific monitor
+python Ambilight.pyw --width 1920    # monitor width hint
+python Ambilight.pyw --brightness 70 # cap brightness at 70%
+python Ambilight.pyw --no-sync       # independent device updates
+python Ambilight.pyw --test          # test colors
+python Ambilight.pyw --list          # list devices
+python Ambilight.pyw --restore       # reset devices to default mode
 ```
 Press `Ctrl+C` to stop the script.
 
@@ -59,7 +74,7 @@ Run `ambilight_hotkey.ahk` (requires [AutoHotkey v2](https://www.autohotkey.com/
   * Go to OpenRGB, find your header (e.g., JRAINBOW), and resize the zone to match the exact number of LEDs connected.
 
 ## How it works
-The script captures your screen directly from the GPU using `dxcam` (Desktop Duplication API), which uses almost 0% CPU. It then calculates the most vibrant dominant color using `numpy`, smoothly transitions the colors, and sends commands over a local TCP connection to the OpenRGB SDK Server.
+The script captures your screen through the Windows Desktop Duplication API and shrinks each frame on the GPU, so only a thumbnail ever reaches the CPU and capture uses almost 0% CPU. It then calculates the most vibrant dominant color using `numpy`, smoothly transitions the colors, and sends commands over a local TCP connection to the OpenRGB SDK Server.
 
 ---
 ## Support

@@ -1,0 +1,87 @@
+--- a/RGBController/RGBController.cpp
++++ b/RGBController/RGBController.cpp
+@@ -2184,10 +2184,12 @@
+         if(CallFlag_UpdateLEDs.exchange(false) == true)
+         {
+             std::chrono::steady_clock::time_point update_start;
++            RGBColor timing_color = 0;
+ 
+             if(timing_enabled)
+             {
+                 update_start = std::chrono::steady_clock::now();
++                timing_color = colors.empty() ? 0 : colors.front();
+             }
+ 
+             DeviceUpdateLEDs();
+@@ -2195,6 +2197,11 @@
+             if(timing_enabled)
+             {
+                 double elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - update_start).count();
++                LOG_VERBOSE("[FrameTiming] %s start=%.3f duration=%.3f rgb=%06X end_rgb=%06X",
++                            name.c_str(),
++                            std::chrono::duration<double, std::milli>(update_start.time_since_epoch()).count(),
++                            elapsed, (unsigned int)timing_color,
++                            (unsigned int)(colors.empty() ? 0 : colors.front()));
+ 
+                 if((timing_count == 0) || (elapsed < timing_min))
+                 {
+--- a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
++++ b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
+@@ -381,9 +381,29 @@
+     int ret = 0;
+     bool flag = true;
+ 
++    auto send_packet = [this](FeaturePacket_PerLED_761& packet, const char* zone)
++    {
++        const bool timing = LogManager::get()->getLoglevel() >= LL_VERBOSE;
++        std::chrono::steady_clock::time_point start;
++        if(timing)
++        {
++            start = std::chrono::steady_clock::now();
++        }
++        int result = hid_send_feature_report(dev, GET_CHAR_PTR_REF(packet), sizeof(packet));
++        if(timing)
++        {
++            LOG_VERBOSE("[ZoneTiming] %s %s start=%.3f duration=%.3f rgb=%06X result=%d",
++                        name.c_str(), zone,
++                        std::chrono::duration<double, std::milli>(start.time_since_epoch()).count(),
++                        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(),
++                        (unsigned int)ToRGBColor(packet.colors[0], packet.colors[1], packet.colors[2]), result);
++        }
++        return result;
++    };
++
+     if(HasPerLedData(MSI_ZONE_JAF))
+     {
+-        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jaf.packet) , sizeof(FeaturePacket_PerLED_761));
++        ret = send_packet(data->jaf.packet, "JAF");
+         if(ret < 0)
+         {
+             flag = false;
+@@ -391,7 +411,7 @@
+     }
+     if(HasPerLedData(MSI_ZONE_JARGB_1))
+     {
+-        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb1.packet) , sizeof(FeaturePacket_PerLED_761));
++        ret = send_packet(data->jargb1.packet, "JARGB1");
+         if(ret < 0)
+         {
+             flag = false;
+@@ -399,7 +419,7 @@
+     }
+     if(HasPerLedData(MSI_ZONE_JARGB_2))
+     {
+-        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb2.packet) , sizeof(FeaturePacket_PerLED_761));
++        ret = send_packet(data->jargb2.packet, "JARGB2");
+         if(ret < 0)
+         {
+             flag = false;
+@@ -407,7 +427,7 @@
+     }
+     if(HasPerLedData(MSI_ZONE_JARGB_3))
+     {
+-        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb3.packet) , sizeof(FeaturePacket_PerLED_761));
++        ret = send_packet(data->jargb3.packet, "JARGB3");
+         if(ret < 0)
+         {
+             flag = false;

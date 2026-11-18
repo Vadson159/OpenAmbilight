@@ -1,0 +1,294 @@
+diff --git a/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp b/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp
+index f94f1bcc..b9a483ca 100644
+--- a/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp
++++ b/Controllers/KingstonFuryDRAMController/KingstonFuryDRAMController.cpp
+@@ -320,14 +320,33 @@ void KingstonFuryDRAMController::SetLEDColors(std::vector<RGBColor> colors)
+         return;
+     }
+ 
+-    unsigned int led_per_dimm = GetLEDPerDIMM();
++    /*-----------------------------------------------------------------*\
++    | Write every colour register back to back and delay only once, at  |
++    | the end.                                                          |
++    |                                                                   |
++    | SetRegister() sleeps FURY_DELAY after each register it actually   |
++    | writes. A solid colour changes all three channels of all LEDs, so |
++    | routing the colour data through SetRegister() spends              |
++    | 3 x LEDs-per-DIMM x FURY_DELAY = 360 ms per frame on a DDR5 pair  |
++    | -- two orders of magnitude more than any other device here takes, |
++    | which is what makes the DRAM trail the rest of the system by      |
++    | roughly half a second when it is driven from a screen-sync app.   |
++    |                                                                   |
++    | The delay exists for the transaction handshake (begin / index /   |
++    | apply), not for the colour registers: the modules accept those    |
++    | back to back, which is how the vendor software drives them at     |
++    | full frame rate. One delay after the last register is enough to   |
++    | let the controller settle before SendApply() latches the frame.   |
++    \*-----------------------------------------------------------------*/
++    unsigned int led_per_dimm  = GetLEDPerDIMM();
++    bool         write_occurred = false;
++
+     for(unsigned int led_idx = 0; led_idx < led_per_dimm; led_idx++)
+     {
+-        int red_register    = FURY_REG_BASE_RED   + 3 * led_idx;
+-        int green_register  = FURY_REG_BASE_GREEN + 3 * led_idx;
+-        int blue_register   = FURY_REG_BASE_BLUE  + 3 * led_idx;
++        unsigned char red_register   = (unsigned char)(FURY_REG_BASE_RED   + 3 * led_idx);
++        unsigned char green_register = (unsigned char)(FURY_REG_BASE_GREEN + 3 * led_idx);
++        unsigned char blue_register  = (unsigned char)(FURY_REG_BASE_BLUE  + 3 * led_idx);
+ 
+-        std::vector<unsigned char> reds, greens, blues;
+         for(std::size_t slot_idx = 0; slot_idx < GetSlotCount(); slot_idx++)
+         {
+             RGBColor color      = colors[slot_idx * led_per_dimm + led_idx];
+@@ -335,14 +354,15 @@ void KingstonFuryDRAMController::SetLEDColors(std::vector<RGBColor> colors)
+             unsigned char green = RGBGetGValue(color);
+             unsigned char blue  = RGBGetBValue(color);
+ 
+-            reds.push_back(red);
+-            greens.push_back(green);
+-            blues.push_back(blue);
++            write_occurred = CachedWrite((int)slot_idx, red_register,   red)   || write_occurred;
++            write_occurred = CachedWrite((int)slot_idx, blue_register,  blue)  || write_occurred;
++            write_occurred = CachedWrite((int)slot_idx, green_register, green) || write_occurred;
+         }
++    }
+ 
+-        SetRegister(red_register, reds);
+-        SetRegister(blue_register, blues);
+-        SetRegister(green_register, greens);
++    if(write_occurred)
++    {
++        std::this_thread::sleep_for(FURY_DELAY);
+     }
+ }
+ 
+diff --git a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
+index 54e0b51d..e2f6d2bb 100644
+--- a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
++++ b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.cpp
+@@ -380,25 +380,38 @@ bool MSIMysticLight761Controller::Update
+ {
+     int ret = 0;
+     bool flag = true;
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jaf.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++
++    if(HasPerLedData(MSI_ZONE_JAF))
+     {
+-        flag = false;
++        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jaf.packet) , sizeof(FeaturePacket_PerLED_761));
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb1.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++    if(HasPerLedData(MSI_ZONE_JARGB_1))
+     {
+-        flag = false;
++        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb1.packet) , sizeof(FeaturePacket_PerLED_761));
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb2.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++    if(HasPerLedData(MSI_ZONE_JARGB_2))
+     {
+-        flag = false;
++        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb2.packet) , sizeof(FeaturePacket_PerLED_761));
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+-    ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb3.packet) , sizeof(FeaturePacket_PerLED_761));
+-    if(ret < 0)
++    if(HasPerLedData(MSI_ZONE_JARGB_3))
+     {
+-        flag = false;
++        ret = hid_send_feature_report(dev, GET_CHAR_PTR_REF(data->jargb3.packet) , sizeof(FeaturePacket_PerLED_761));
++        if(ret < 0)
++        {
++            flag = false;
++        }
+     }
+ 
+     return flag;
+@@ -473,6 +486,60 @@ void MSIMysticLight761Controller::SetLedColor
+         set_data_color(ptr, candidate_index,     red);
+         set_data_color(ptr, candidate_index + 1, grn);
+         set_data_color(ptr, candidate_index + 2, blu);
++
++        switch(zone)
++        {
++        case MSI_ZONE_JAF:
++            jaf_per_led_data    = true;
++            break;
++        case MSI_ZONE_JARGB_1:
++            jargb1_per_led_data = true;
++            break;
++        case MSI_ZONE_JARGB_2:
++            jargb2_per_led_data = true;
++            break;
++        case MSI_ZONE_JARGB_3:
++            jargb3_per_led_data = true;
++            break;
++        default:
++            break;
++        }
++    }
++}
++
++bool MSIMysticLight761Controller::HasPerLedData
++    (
++    MSI_ZONE zone
++    )
++{
++    /*-----------------------------------------------------------------*\
++    | Whether this zone has ever been given per-LED colour data.        |
++    |                                                                   |
++    | Update() sends one 727-byte HID feature report per zone, and the  |
++    | board's lighting MCU is a low-speed USB device: a report costs    |
++    | about 93 ms regardless of how many LEDs the zone holds (measured  |
++    | unchanged with zones resized from 60 LEDs down to 4). Four of     |
++    | them is ~370 ms per frame, which not only makes the board trail   |
++    | every other device by a third of a second but starves the other   |
++    | HID devices sharing the bus -- a keyboard that updates in 33 ms   |
++    | on its own was measured at 800 ms while this ran alongside it.    |
++    |                                                                   |
++    | A header with nothing connected is sized to 0 LEDs in OpenRGB and |
++    | never reaches SetLedColor(), so its packet carries nothing and    |
++    | can be left out. Every skipped zone is ~93 ms off the frame time. |
++    \*-----------------------------------------------------------------*/
++    switch(zone)
++    {
++    case MSI_ZONE_JAF:
++        return jaf_per_led_data;
++    case MSI_ZONE_JARGB_1:
++        return jargb1_per_led_data;
++    case MSI_ZONE_JARGB_2:
++        return jargb2_per_led_data;
++    case MSI_ZONE_JARGB_3:
++        return jargb3_per_led_data;
++    default:
++        return true;
+     }
+ }
+ 
+diff --git a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h
+index c9eab05d..cb94461c 100644
+--- a/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h
++++ b/Controllers/MSIMysticLightController/MSIMysticLight761Controller/MSIMysticLight761Controller.h
+@@ -137,6 +137,19 @@ private:
+     std::string                                             version_ldrom;
+     FeaturePacket_761* data;
+ 
++    /*-----------------------------------------------------------------*\
++    | Set once a zone has actually been given per-LED colour data. A     |
++    | header with nothing plugged into it is sized to 0 LEDs in OpenRGB, |
++    | so it never reaches SetLedColor() and its packet can be skipped.   |
++    | See HasPerLedData() for why that matters.                          |
++    \*-----------------------------------------------------------------*/
++    bool            jaf_per_led_data    = false;
++    bool            jargb1_per_led_data = false;
++    bool            jargb2_per_led_data = false;
++    bool            jargb3_per_led_data = false;
++
++    bool            HasPerLedData(MSI_ZONE zone);
++
+     bool            ReadSettings();
+     bool            ReadFwVersion();
+     void            ReadName();
+diff --git a/RGBController/RGBController.cpp b/RGBController/RGBController.cpp
+index b1bfd6b8..41378131 100644
+--- a/RGBController/RGBController.cpp
++++ b/RGBController/RGBController.cpp
+@@ -12,6 +12,7 @@
+ 
+ #include <cstring>
+ #include "RGBController.h"
++#include "LogManager.h"
+ 
+ using namespace std::chrono_literals;
+ 
+@@ -2113,6 +2114,25 @@ void RGBController::DeviceCallThreadFunction()
+     CallFlag_UpdateLEDs = false;
+     CallFlag_UpdateMode = false;
+ 
++    /*-----------------------------------------------------------------*\
++    | Update timing instrumentation                                     |
++    |                                                                   |
++    | UpdateLEDs() from a client only raises a flag, so an SDK client   |
++    | cannot see how long a device really takes to push a frame to the  |
++    | hardware -- which is what decides whether devices change colour   |
++    | together or seconds apart. When the log level is verbose or       |
++    | higher, time DeviceUpdateLEDs() and log a summary every           |
++    | UPDATE_TIMING_WINDOW frames. At the default log level this costs  |
++    | one bool test per loop iteration.                                 |
++    \*-----------------------------------------------------------------*/
++    const unsigned int UPDATE_TIMING_WINDOW = 100;
++
++    const bool   timing_enabled = (LogManager::get()->getLoglevel() >= LL_VERBOSE);
++    unsigned int timing_count   = 0;
++    double       timing_sum     = 0.0;
++    double       timing_min     = 0.0;
++    double       timing_max     = 0.0;
++
+     while(DeviceThreadRunning.load() == true)
+     {
+         if(CallFlag_UpdateMode.load() == true)
+@@ -2130,6 +2150,13 @@ void RGBController::DeviceCallThreadFunction()
+         }
+         if(CallFlag_UpdateLEDs.load() == true)
+         {
++            std::chrono::steady_clock::time_point update_start;
++
++            if(timing_enabled)
++            {
++                update_start = std::chrono::steady_clock::now();
++            }
++
+             if(flags & CONTROLLER_FLAG_RESET_BEFORE_UPDATE)
+             {
+                 CallFlag_UpdateLEDs = false;
+@@ -2140,6 +2167,36 @@ void RGBController::DeviceCallThreadFunction()
+                 DeviceUpdateLEDs();
+                 CallFlag_UpdateLEDs = false;
+             }
++
++            if(timing_enabled)
++            {
++                double elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - update_start).count();
++
++                if((timing_count == 0) || (elapsed < timing_min))
++                {
++                    timing_min = elapsed;
++                }
++
++                if(elapsed > timing_max)
++                {
++                    timing_max = elapsed;
++                }
++
++                timing_sum += elapsed;
++                timing_count++;
++
++                if(timing_count >= UPDATE_TIMING_WINDOW)
++                {
++                    LOG_VERBOSE("[UpdateTiming] %s: n=%u avg=%.2f ms min=%.2f ms max=%.2f ms",
++                                name.c_str(), timing_count,
++                                timing_sum / timing_count, timing_min, timing_max);
++
++                    timing_count = 0;
++                    timing_sum   = 0.0;
++                    timing_min   = 0.0;
++                    timing_max   = 0.0;
++                }
++            }
+         }
+         else
+         {

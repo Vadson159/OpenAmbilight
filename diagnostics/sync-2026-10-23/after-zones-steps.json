@@ -1,0 +1,2406 @@
+{
+  "source": "S:\\_Vibe_Coding\\Ambilight\\Ambilight.pyw",
+  "sync": true,
+  "pattern": "steps",
+  "seconds": 13.0,
+  "devices": {
+    "0": "Kingston Fury DDR5 DRAM",
+    "1": "XPG Summoner Gaming Keyboard",
+    "2": "MSI MYSTIC LIGHT",
+    "3": "Roccat Burst Pro"
+  },
+  "inputs": [
+    {
+      "time": 20741.2296106,
+      "rgb": [
+        24,
+        24,
+        24
+      ]
+    },
+    {
+      "time": 20741.8798098,
+      "rgb": [
+        61,
+        77,
+        95
+      ]
+    },
+    {
+      "time": 20742.530117,
+      "rgb": [
+        98,
+        130,
+        166
+      ]
+    },
+    {
+      "time": 20743.1796946,
+      "rgb": [
+        135,
+        183,
+        56
+      ]
+    },
+    {
+      "time": 20743.8301772,
+      "rgb": [
+        172,
+        57,
+        127
+      ]
+    },
+    {
+      "time": 20744.4797832,
+      "rgb": [
+        36,
+        110,
+        198
+      ]
+    },
+    {
+      "time": 20745.1299559,
+      "rgb": [
+        73,
+        163,
+        88
+      ]
+    },
+    {
+      "time": 20745.7797237,
+      "rgb": [
+        110,
+        37,
+        159
+      ]
+    },
+    {
+      "time": 20746.4297756,
+      "rgb": [
+        147,
+        90,
+        49
+      ]
+    },
+    {
+      "time": 20747.0800297,
+      "rgb": [
+        184,
+        143,
+        120
+      ]
+    },
+    {
+      "time": 20747.7300716,
+      "rgb": [
+        48,
+        196,
+        191
+      ]
+    },
+    {
+      "time": 20748.3800324,
+      "rgb": [
+        85,
+        70,
+        81
+      ]
+    },
+    {
+      "time": 20749.0298503,
+      "rgb": [
+        122,
+        123,
+        152
+      ]
+    },
+    {
+      "time": 20749.6796912,
+      "rgb": [
+        159,
+        176,
+        42
+      ]
+    },
+    {
+      "time": 20750.3297101,
+      "rgb": [
+        196,
+        50,
+        113
+      ]
+    },
+    {
+      "time": 20750.980097,
+      "rgb": [
+        60,
+        103,
+        184
+      ]
+    },
+    {
+      "time": 20751.6296828,
+      "rgb": [
+        97,
+        156,
+        74
+      ]
+    },
+    {
+      "time": 20752.2800007,
+      "rgb": [
+        134,
+        30,
+        145
+      ]
+    },
+    {
+      "time": 20752.9297574,
+      "rgb": [
+        171,
+        83,
+        35
+      ]
+    },
+    {
+      "time": 20753.5799895,
+      "rgb": [
+        35,
+        136,
+        106
+      ]
+    }
+  ],
+  "writes": [
+    {
+      "time": 20741.2296498,
+      "device": 2,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20741.2829141,
+      "device": 0,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20741.3919265,
+      "device": 1,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20741.4234846,
+      "device": 3,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20741.8798713,
+      "device": 2,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20741.9277254,
+      "device": 0,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20742.0375975,
+      "device": 1,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20742.0692284,
+      "device": 3,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20742.5301763,
+      "device": 2,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20742.5874321,
+      "device": 0,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20742.6964156,
+      "device": 1,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20742.7276144,
+      "device": 3,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.179754,
+      "device": 2,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.2276372,
+      "device": 0,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.3364966,
+      "device": 1,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.3679888,
+      "device": 3,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.8302415,
+      "device": 2,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.8787245,
+      "device": 0,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20743.9872056,
+      "device": 1,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20744.017649,
+      "device": 3,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20744.4798511,
+      "device": 2,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20744.5338475,
+      "device": 0,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20744.6427662,
+      "device": 1,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20744.6734832,
+      "device": 3,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.1300207,
+      "device": 2,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.1900556,
+      "device": 0,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.2998855,
+      "device": 1,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.3151569,
+      "device": 3,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.779781,
+      "device": 2,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.8286955,
+      "device": 0,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.938229,
+      "device": 1,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20745.9699363,
+      "device": 3,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20746.4298646,
+      "device": 2,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20746.4829643,
+      "device": 0,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20746.5918876,
+      "device": 1,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20746.6220836,
+      "device": 3,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.0800939,
+      "device": 2,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.1401408,
+      "device": 0,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.2484339,
+      "device": 1,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.2639891,
+      "device": 3,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.7301317,
+      "device": 2,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.777656,
+      "device": 0,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.8867464,
+      "device": 1,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20747.918148,
+      "device": 3,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20748.3800973,
+      "device": 2,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20748.4301288,
+      "device": 0,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20748.5384434,
+      "device": 1,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20748.5694243,
+      "device": 3,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.0299085,
+      "device": 2,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.0837398,
+      "device": 0,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.1917521,
+      "device": 1,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.2223832,
+      "device": 3,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.6797487,
+      "device": 2,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.7372733,
+      "device": 0,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.8472089,
+      "device": 1,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20749.8786175,
+      "device": 3,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20750.3297695,
+      "device": 2,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20750.3767991,
+      "device": 0,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20750.4863792,
+      "device": 1,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20750.5174399,
+      "device": 3,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20750.9801611,
+      "device": 2,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.028223,
+      "device": 0,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.1371405,
+      "device": 1,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.1690482,
+      "device": 3,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.6297514,
+      "device": 2,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.6854977,
+      "device": 0,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.7945549,
+      "device": 1,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20751.82567,
+      "device": 3,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20752.2800719,
+      "device": 2,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20752.3372384,
+      "device": 0,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20752.4462749,
+      "device": 1,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20752.4766787,
+      "device": 3,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20752.9298181,
+      "device": 2,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20752.9760513,
+      "device": 0,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20753.0856509,
+      "device": 1,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20753.1163397,
+      "device": 3,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20753.5800512,
+      "device": 2,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20753.6339066,
+      "device": 0,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20753.7436463,
+      "device": 1,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20753.7751335,
+      "device": 3,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20754.5859812,
+      "device": 2,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20754.6309685,
+      "device": 0,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20754.754788,
+      "device": 1,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    },
+    {
+      "time": 20754.7699799,
+      "device": 3,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "result": "sent"
+    }
+  ],
+  "frames": [
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20741.283055,
+      "duration_ms": 129.355,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20741.229751,
+      "duration_ms": 185.192,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20741.423579,
+      "duration_ms": 1.178,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20741.392148,
+      "duration_ms": 35.299,
+      "rgb": [
+        24,
+        24,
+        24
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20741.879978999998,
+      "duration_ms": 184.9,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20742.037728,
+      "duration_ms": 30.918,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20741.928133,
+      "duration_ms": 140.526,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20742.069328,
+      "duration_ms": 1.61,
+      "rgb": [
+        61,
+        77,
+        95
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20742.530280000003,
+      "duration_ms": 184.625,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20742.587532,
+      "duration_ms": 128.517,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20742.696605,
+      "duration_ms": 27.964,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20742.727725,
+      "duration_ms": 2.06,
+      "rgb": [
+        98,
+        130,
+        166
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20743.227759,
+      "duration_ms": 122.307,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20743.336604,
+      "duration_ms": 27.298,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20743.368178,
+      "duration_ms": 1.616,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20743.179862,
+      "duration_ms": 203.647,
+      "rgb": [
+        135,
+        183,
+        56
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20743.87885,
+      "duration_ms": 132.187,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20743.830353999998,
+      "duration_ms": 184.567,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20744.017752,
+      "duration_ms": 2.055,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20743.987317000003,
+      "duration_ms": 33.48,
+      "rgb": [
+        172,
+        57,
+        127
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20744.53397,
+      "duration_ms": 129.909,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20744.479965,
+      "duration_ms": 184.968,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20744.673612,
+      "duration_ms": 1.215,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20744.642873,
+      "duration_ms": 35.053,
+      "rgb": [
+        36,
+        110,
+        198
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20745.130125,
+      "duration_ms": 184.816,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20745.315285,
+      "duration_ms": 1.54,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20745.19017,
+      "duration_ms": 132.466,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20745.300186,
+      "duration_ms": 32.513,
+      "rgb": [
+        73,
+        163,
+        88
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20745.828855,
+      "duration_ms": 131.026,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20745.779910999998,
+      "duration_ms": 185.051,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20745.970031,
+      "duration_ms": 1.808,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20745.93839,
+      "duration_ms": 35.023,
+      "rgb": [
+        110,
+        37,
+        159
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20746.483179000003,
+      "duration_ms": 118.142,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20746.592000999997,
+      "duration_ms": 21.883,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20746.429967999997,
+      "duration_ms": 184.991,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20746.62232,
+      "duration_ms": 1.53,
+      "rgb": [
+        147,
+        90,
+        49
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20747.080204,
+      "duration_ms": 184.801,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20747.264089,
+      "duration_ms": 1.776,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20747.248537,
+      "duration_ms": 21.838,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20747.140487,
+      "duration_ms": 130.904,
+      "rgb": [
+        184,
+        143,
+        120
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20747.777774000002,
+      "duration_ms": 121.38,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20747.886852000003,
+      "duration_ms": 24.834,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20747.730241,
+      "duration_ms": 184.741,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20747.918255,
+      "duration_ms": 1.622,
+      "rgb": [
+        48,
+        196,
+        191
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20748.3802,
+      "duration_ms": 184.835,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20748.539015000002,
+      "duration_ms": 29.239,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20748.569553,
+      "duration_ms": 1.338,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20748.43028,
+      "duration_ms": 152.52,
+      "rgb": [
+        85,
+        70,
+        81
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20749.030017,
+      "duration_ms": 185.007,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20749.191852000004,
+      "duration_ms": 31.971,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20749.222524,
+      "duration_ms": 1.372,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20749.083852000003,
+      "duration_ms": 146.416,
+      "rgb": [
+        122,
+        123,
+        152
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20749.679857,
+      "duration_ms": 185.306,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20749.737399999998,
+      "duration_ms": 132.244,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20749.878725000002,
+      "duration_ms": 1.187,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20749.847346000002,
+      "duration_ms": 32.719,
+      "rgb": [
+        159,
+        176,
+        42
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20750.376905,
+      "duration_ms": 131.15,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20750.329876,
+      "duration_ms": 185.173,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20750.517563999998,
+      "duration_ms": 1.357,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20750.486494,
+      "duration_ms": 33.739,
+      "rgb": [
+        196,
+        50,
+        113
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20751.028364,
+      "duration_ms": 124.537,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20751.137251,
+      "duration_ms": 24.659,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20750.98027,
+      "duration_ms": 185.088,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20751.169176,
+      "duration_ms": 1.758,
+      "rgb": [
+        60,
+        103,
+        184
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20751.629856,
+      "duration_ms": 185.255,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20751.794725,
+      "duration_ms": 23.361,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20751.685635,
+      "duration_ms": 134.481,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20751.825765,
+      "duration_ms": 1.187,
+      "rgb": [
+        97,
+        156,
+        74
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20752.2802,
+      "duration_ms": 184.94,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20752.337399,
+      "duration_ms": 129.984,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20752.446401,
+      "duration_ms": 27.505,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20752.476808,
+      "duration_ms": 1.16,
+      "rgb": [
+        134,
+        30,
+        145
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20753.085749,
+      "duration_ms": 28.507,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20752.929922,
+      "duration_ms": 185.137,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20752.976141,
+      "duration_ms": 141.13,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20753.116462,
+      "duration_ms": 1.513,
+      "rgb": [
+        171,
+        83,
+        35
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20753.634044,
+      "duration_ms": 123.048,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20753.580157,
+      "duration_ms": 184.944,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20753.74377,
+      "duration_ms": 26.411,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20753.775245,
+      "duration_ms": 1.764,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Kingston Fury DDR5 DRAM",
+      "start": 20754.631068,
+      "duration_ms": 35.511,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "MSI MYSTIC LIGHT",
+      "start": 20754.586156,
+      "duration_ms": 184.969,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "Roccat Burst Pro",
+      "start": 20754.770058,
+      "duration_ms": 1.956,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    },
+    {
+      "device": "XPG Summoner Gaming Keyboard",
+      "start": 20754.754898,
+      "duration_ms": 32.06,
+      "rgb": [
+        35,
+        136,
+        106
+      ],
+      "changed_during_write": false
+    }
+  ],
+  "zones": [
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20741.229753,
+      "duration_ms": 92.099,
+      "result": 727,
+      "rgb": [
+        24,
+        24,
+        24
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20741.321877000002,
+      "duration_ms": 93.027,
+      "result": 727,
+      "rgb": [
+        24,
+        24,
+        24
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20741.879981,
+      "duration_ms": 91.89,
+      "result": 727,
+      "rgb": [
+        61,
+        77,
+        95
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20741.971897,
+      "duration_ms": 92.955,
+      "result": 727,
+      "rgb": [
+        61,
+        77,
+        95
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20742.530282,
+      "duration_ms": 91.596,
+      "result": 727,
+      "rgb": [
+        98,
+        130,
+        166
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20742.621905,
+      "duration_ms": 92.969,
+      "result": 727,
+      "rgb": [
+        98,
+        130,
+        166
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20743.179864,
+      "duration_ms": 92.025,
+      "result": 727,
+      "rgb": [
+        135,
+        183,
+        56
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20743.271917,
+      "duration_ms": 92.974,
+      "result": 727,
+      "rgb": [
+        135,
+        183,
+        56
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20743.830356,
+      "duration_ms": 91.547,
+      "result": 727,
+      "rgb": [
+        172,
+        57,
+        127
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20743.921929,
+      "duration_ms": 92.972,
+      "result": 727,
+      "rgb": [
+        172,
+        57,
+        127
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20744.479967,
+      "duration_ms": 91.959,
+      "result": 727,
+      "rgb": [
+        36,
+        110,
+        198
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20744.571971999998,
+      "duration_ms": 92.942,
+      "result": 727,
+      "rgb": [
+        36,
+        110,
+        198
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20745.130127999997,
+      "duration_ms": 91.794,
+      "result": 727,
+      "rgb": [
+        73,
+        163,
+        88
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20745.221962,
+      "duration_ms": 92.95,
+      "result": 727,
+      "rgb": [
+        73,
+        163,
+        88
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20745.779913,
+      "duration_ms": 92.022,
+      "result": 727,
+      "rgb": [
+        110,
+        37,
+        159
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20745.871962,
+      "duration_ms": 92.977,
+      "result": 727,
+      "rgb": [
+        110,
+        37,
+        159
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20746.429969999997,
+      "duration_ms": 91.98,
+      "result": 727,
+      "rgb": [
+        147,
+        90,
+        49
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20746.52198,
+      "duration_ms": 92.96,
+      "result": 727,
+      "rgb": [
+        147,
+        90,
+        49
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20747.080206,
+      "duration_ms": 91.767,
+      "result": 727,
+      "rgb": [
+        184,
+        143,
+        120
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20747.172004,
+      "duration_ms": 92.974,
+      "result": 727,
+      "rgb": [
+        184,
+        143,
+        120
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20747.730244,
+      "duration_ms": 91.731,
+      "result": 727,
+      "rgb": [
+        48,
+        196,
+        191
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20747.822045,
+      "duration_ms": 92.918,
+      "result": 727,
+      "rgb": [
+        48,
+        196,
+        191
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20748.380202,
+      "duration_ms": 91.816,
+      "result": 727,
+      "rgb": [
+        85,
+        70,
+        81
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20748.472081,
+      "duration_ms": 92.909,
+      "result": 727,
+      "rgb": [
+        85,
+        70,
+        81
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20749.03002,
+      "duration_ms": 91.983,
+      "result": 727,
+      "rgb": [
+        122,
+        123,
+        152
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20749.122032000003,
+      "duration_ms": 92.968,
+      "result": 727,
+      "rgb": [
+        122,
+        123,
+        152
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20749.67986,
+      "duration_ms": 92.169,
+      "result": 727,
+      "rgb": [
+        159,
+        176,
+        42
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20749.772056,
+      "duration_ms": 93.079,
+      "result": 727,
+      "rgb": [
+        159,
+        176,
+        42
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20750.329877999997,
+      "duration_ms": 92.149,
+      "result": 727,
+      "rgb": [
+        196,
+        50,
+        113
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20750.422056000003,
+      "duration_ms": 92.96,
+      "result": 727,
+      "rgb": [
+        196,
+        50,
+        113
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20750.980272,
+      "duration_ms": 91.756,
+      "result": 727,
+      "rgb": [
+        60,
+        103,
+        184
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20751.072059000002,
+      "duration_ms": 93.276,
+      "result": 727,
+      "rgb": [
+        60,
+        103,
+        184
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20751.629858,
+      "duration_ms": 92.331,
+      "result": 727,
+      "rgb": [
+        97,
+        156,
+        74
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20751.722242,
+      "duration_ms": 92.822,
+      "result": 727,
+      "rgb": [
+        97,
+        156,
+        74
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20752.280203000002,
+      "duration_ms": 91.848,
+      "result": 727,
+      "rgb": [
+        134,
+        30,
+        145
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20752.372076,
+      "duration_ms": 93.007,
+      "result": 727,
+      "rgb": [
+        134,
+        30,
+        145
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20752.929924,
+      "duration_ms": 92.138,
+      "result": 727,
+      "rgb": [
+        171,
+        83,
+        35
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20753.022089000002,
+      "duration_ms": 92.963,
+      "result": 727,
+      "rgb": [
+        171,
+        83,
+        35
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20753.580159,
+      "duration_ms": 91.923,
+      "result": 727,
+      "rgb": [
+        35,
+        136,
+        106
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20753.672111,
+      "duration_ms": 92.967,
+      "result": 727,
+      "rgb": [
+        35,
+        136,
+        106
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB2",
+      "start": 20754.586158,
+      "duration_ms": 91.931,
+      "result": 727,
+      "rgb": [
+        35,
+        136,
+        106
+      ]
+    },
+    {
+      "zone": "MSI MYSTIC LIGHT JARGB3",
+      "start": 20754.678113,
+      "duration_ms": 92.98,
+      "result": 727,
+      "rgb": [
+        35,
+        136,
+        106
+      ]
+    }
+  ]
+}
