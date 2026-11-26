@@ -7,9 +7,24 @@ Sync PC RGB with screen colors using OpenRGB.
 ## What it does
 Captures the dominant color from your monitor and sends it to all RGB devices through OpenRGB. It works with RAM, fans, strips, motherboard LEDs, and any other device supported by OpenRGB.
 
+## Two ways to run it
+
+1. **Inside OpenRGB, as a plugin** (`plugin/`, what this PC uses). A C++ port
+   of the Python app, loaded by the patched OpenRGB in `OpenRGB-patched/`: an
+   "Ambilight" tab in the OpenRGB window, an Ambilight entry in OpenRGB's tray
+   menu, `Ctrl+Alt+A`, and it starts together with OpenRGB at logon. No Python,
+   no SDK connection, ~0.4% of one core for OpenRGB and Ambilight together.
+   Build, install and tests: [plugin/README.md](plugin/README.md). The plugin
+   must be built with the same compiler and headers as the OpenRGB it loads
+   into.
+2. **Standalone Python app** (`Ambilight.pyw`), talking to any OpenRGB through
+   its SDK server — the rest of this page. When the plugin is installed next
+   to it, double-clicking `Ambilight.pyw` offers to open OpenRGB instead (two
+   copies would drive the LEDs twice); `--legacy` forces the old window.
+
 ## Device synchronization
 
-The current single-file app is `Ambilight.pyw`. **Sync all devices** is enabled
+The single-file Python app is `Ambilight.pyw`. **Sync all devices** is enabled
 by default: every device receives the same sampled frames, scheduled using
 measured hardware delays. The shared update rate follows the slowest device
 (about 3.6 FPS on this PC), independently of the screen capture FPS. Separate
@@ -62,7 +77,10 @@ python Ambilight.pyw --restore       # reset devices to default mode
 Press `Ctrl+C` to stop the script.
 
 ## Hotkey (Optional)
-Run `ambilight_hotkey.ahk` (requires [AutoHotkey v2](https://www.autohotkey.com/)):
+The OpenRGB plugin and the Python window both register `Ctrl+Alt+A` (configurable)
+themselves. For the old script-only setup, `ambilight_hotkey.ahk` (requires
+[AutoHotkey v2](https://www.autohotkey.com/)) does the same — don't run it next
+to either of them:
 * `Ctrl+Alt+A`: Toggle Ambilight ON/OFF
 
 ## Troubleshooting
@@ -75,6 +93,8 @@ Run `ambilight_hotkey.ahk` (requires [AutoHotkey v2](https://www.autohotkey.com/
 
 ## How it works
 The script captures your screen through the Windows Desktop Duplication API and shrinks each frame on the GPU, so only a thumbnail ever reaches the CPU and capture uses almost 0% CPU. It then calculates the most vibrant dominant color using `numpy`, smoothly transitions the colors, and sends commands over a local TCP connection to the OpenRGB SDK Server.
+
+The plugin does the same in C++ inside the OpenRGB process and hands the colours straight to OpenRGB's device objects; its analysis is checked bit for bit against the Python functions (`plugin/tests/compare_colormath.py`).
 
 ---
 ## Support

@@ -738,8 +738,57 @@ index 8e68a856..c3e147bd 100644
          -L"$$PWD/dependencies/PawnIO/" -lPawnIOLib                                              \
  }
  
+diff --git a/PluginManager.cpp b/PluginManager.cpp
+index 4e52eb50..e271dea2 100644
+--- a/PluginManager.cpp
++++ b/PluginManager.cpp
+@@ -208,9 +208,12 @@ void PluginManager::AddPlugin(const filesystem::path& path, bool is_system)
+ 
+                     /*-----------------------------------------------------*\
+                     | Search the settings to see if it is enabled           |
++                    |                                                       |
++                    | Only the matching entry's "enabled" counts: this used |
++                    | to be read from every entry on the way, so a plugin   |
++                    | seen for the first time inherited the flag of the     |
++                    | last plugin in the list and could start disabled.     |
+                     \*-----------------------------------------------------*/
+-                    std::string     name        = "";
+-                    std::string     description = "";
+                     bool            enabled     = true;
+                     bool            found       = false;
+                     unsigned int    plugin_ct   = 0;
+@@ -221,6 +224,9 @@ void PluginManager::AddPlugin(const filesystem::path& path, bool is_system)
+ 
+                         for(unsigned int plugin_settings_idx = 0; plugin_settings_idx < plugin_settings["plugins"].size(); plugin_settings_idx++)
+                         {
++                            std::string name        = "";
++                            std::string description = "";
++
+                             if(plugin_settings["plugins"][plugin_settings_idx].contains("name"))
+                             {
+                                 name        = plugin_settings["plugins"][plugin_settings_idx]["name"];
+@@ -231,14 +237,14 @@ void PluginManager::AddPlugin(const filesystem::path& path, bool is_system)
+                                 description = plugin_settings["plugins"][plugin_settings_idx]["description"];
+                             }
+ 
+-                            if(plugin_settings["plugins"][plugin_settings_idx].contains("enabled"))
+-                            {
+-                                enabled     = plugin_settings["plugins"][plugin_settings_idx]["enabled"];
+-                            }
+-
+                             if((info.Name == name)
+                              &&(info.Description == description))
+                             {
++                                if(plugin_settings["plugins"][plugin_settings_idx].contains("enabled"))
++                                {
++                                    enabled = plugin_settings["plugins"][plugin_settings_idx]["enabled"];
++                                }
++
+                                 found = true;
+                                 break;
+                             }
 diff --git a/RGBController/RGBController.cpp b/RGBController/RGBController.cpp
-index b1bfd6b8..bd1c2beb 100644
+index b1bfd6b8..bcd12dce 100644
 --- a/RGBController/RGBController.cpp
 +++ b/RGBController/RGBController.cpp
 @@ -12,6 +12,7 @@
@@ -767,7 +816,43 @@ index b1bfd6b8..bd1c2beb 100644
      DeviceCallThread->join();
      delete DeviceCallThread;
  
-@@ -2051,6 +2055,7 @@ void RGBController::SignalUpdate()
+@@ -2008,14 +2012,26 @@ void RGBController::SetMode(int mode)
+     UpdateMode();
+ }
+ 
++/*---------------------------------------------------------*\
++| The callback list is walked by SignalUpdate() under       |
++| UpdateMutex on whatever thread updates the LEDs (SDK      |
++| clients, the Ambilight plugin), while device pages        |
++| register and unregister on the GUI thread -- e.g. right   |
++| after a rescan. Changing the vectors without the mutex    |
++| could reallocate them under a running SignalUpdate().     |
++\*---------------------------------------------------------*/
+ void RGBController::RegisterUpdateCallback(RGBControllerCallback new_callback, void * new_callback_arg)
+ {
++    std::lock_guard<std::mutex> lock(UpdateMutex);
++
+     UpdateCallbacks.push_back(new_callback);
+     UpdateCallbackArgs.push_back(new_callback_arg);
+ }
+ 
+ void RGBController::UnregisterUpdateCallback(void * callback_arg)
+ {
++    std::lock_guard<std::mutex> lock(UpdateMutex);
++
+     for(unsigned int callback_idx = 0; callback_idx < UpdateCallbackArgs.size(); callback_idx++ )
+     {
+         if(UpdateCallbackArgs[callback_idx] == callback_arg)
+@@ -2030,6 +2046,8 @@ void RGBController::UnregisterUpdateCallback(void * callback_arg)
+ 
+ void RGBController::ClearCallbacks()
+ {
++    std::lock_guard<std::mutex> lock(UpdateMutex);
++
+     UpdateCallbacks.clear();
+     UpdateCallbackArgs.clear();
+ }
+@@ -2051,6 +2069,7 @@ void RGBController::SignalUpdate()
  void RGBController::UpdateLEDs()
  {
      CallFlag_UpdateLEDs = true;
@@ -775,7 +860,7 @@ index b1bfd6b8..bd1c2beb 100644
  
      SignalUpdate();
  }
-@@ -2058,6 +2063,19 @@ void RGBController::UpdateLEDs()
+@@ -2058,6 +2077,19 @@ void RGBController::UpdateLEDs()
  void RGBController::UpdateMode()
  {
      CallFlag_UpdateMode = true;
@@ -795,7 +880,7 @@ index b1bfd6b8..bd1c2beb 100644
  }
  
  void RGBController::SaveMode()
-@@ -2110,41 +2128,107 @@ void RGBController::DeviceUpdateMode()
+@@ -2110,41 +2142,107 @@ void RGBController::DeviceUpdateMode()
  
  void RGBController::DeviceCallThreadFunction()
  {
@@ -846,13 +931,13 @@ index b1bfd6b8..bd1c2beb 100644
 +                    || (CallFlag_UpdateMode.load() == true)
 +                    || (CallFlag_UpdateLEDs.load() == true));
 +            });
-         }
--        if(CallFlag_UpdateLEDs.load() == true)
++        }
 +
 +        if(DeviceThreadRunning.load() == false)
 +        {
 +            break;
-+        }
+         }
+-        if(CallFlag_UpdateLEDs.load() == true)
 +
 +        /*-------------------------------------------------------------*\
 +        | Clear each flag before acting on it, so a request that        |
@@ -862,12 +947,12 @@ index b1bfd6b8..bd1c2beb 100644
 +        | a slow device would sit on a stale colour.                    |
 +        \*-------------------------------------------------------------*/
 +        if(CallFlag_UpdateMode.exchange(false) == true)
-+        {
+         {
+-            if(flags & CONTROLLER_FLAG_RESET_BEFORE_UPDATE)
 +            DeviceUpdateMode();
 +        }
 +        if(CallFlag_UpdateLEDs.exchange(false) == true)
-         {
--            if(flags & CONTROLLER_FLAG_RESET_BEFORE_UPDATE)
++        {
 +            std::chrono::steady_clock::time_point update_start;
 +            RGBColor timing_color = 0;
 +
@@ -954,7 +1039,7 @@ index 364adca0..c3b4b31d 100644
      //bool                    CallFlag_UpdateSingleLED                    = false;
      //bool                    CallFlag_UpdateMode                         = false;
 diff --git a/ResourceManager.cpp b/ResourceManager.cpp
-index 5e97dff0..146ed75b 100644
+index 5e97dff0..24c536ad 100644
 --- a/ResourceManager.cpp
 +++ b/ResourceManager.cpp
 @@ -12,6 +12,9 @@
@@ -999,6 +1084,33 @@ index 5e97dff0..146ed75b 100644
      const wchar_t* appdata = _wgetenv(L"APPDATA");
      if(appdata != NULL)
      {
+@@ -912,6 +940,26 @@ void ResourceManager::ProcessDynamicDetectors()
+ \*---------------------------------------------------------*/
+ bool ResourceManager::ProcessPreDetection()
+ {
++    /*-----------------------------------------------------*\
++    | A detection that is still winding down -- e.g. after  |
++    | "Stop detection", which only clears                   |
++    | detection_is_required -- holds DetectDeviceMutex      |
++    | until its detection-end callbacks have run. Starting  |
++    | over now would announce a new detection to every      |
++    | listener, let the old one's end callbacks hand them   |
++    | the controller list again, and then delete that list  |
++    | in Cleanup(): anything driving devices (the Ambilight |
++    | plugin) would write to freed controllers. Ignore the  |
++    | request instead; a later rescan works normally.       |
++    \*-----------------------------------------------------*/
++    if(!DetectDeviceMutex.try_lock())
++    {
++        LOG_WARNING("[ResourceManager] Rescan ignored: the previous detection is still finishing");
++        return false;
++    }
++
++    DetectDeviceMutex.unlock();
++
+     /*-----------------------------------------------------*\
+     | Process pre-detection hooks                           |
+     \*-----------------------------------------------------*/
 diff --git a/dependencies/httplib/httplib.h b/dependencies/httplib/httplib.h
 index 062f66b8..d1f77781 100644
 --- a/dependencies/httplib/httplib.h
@@ -1161,8 +1273,206 @@ index f958badb..a8e5258d 100644
      bool autoUpdateEnabled();
      void colorChanged();
      void getSelectedZone(bool * selected_all_zones, int * selected_zone, int * selected_segment);
+diff --git a/qt/OpenRGBDialog/OpenRGBDialog.cpp b/qt/OpenRGBDialog/OpenRGBDialog.cpp
+index b6cad235..f3c38415 100644
+--- a/qt/OpenRGBDialog/OpenRGBDialog.cpp
++++ b/qt/OpenRGBDialog/OpenRGBDialog.cpp
+@@ -36,6 +36,12 @@
+ 
+ #include <string>
+ #include <functional>
++#include <thread>
++
++#ifdef _WIN32
++#include <windows.h>
++#include <sddl.h>
++#endif
+ 
+ #ifdef __APPLE__
+ #include "macutils.h"
+@@ -551,9 +557,131 @@ OpenRGBDialog::OpenRGBDialog(QWidget *parent) : QMainWindow(parent), ui(new Ui::
+ 
+ OpenRGBDialog::~OpenRGBDialog()
+ {
++    StopShowWindowListener();
++
+     delete ui;
+ }
+ 
++/*---------------------------------------------------------*\
++| Single instance (Windows)                                 |
++|                                                           |
++|   The instance that detected the devices (the elevated    |
++|   server started at logon) owns a named event. A plain    |
++|   double-click on OpenRGB.exe runs unelevated; instead of |
++|   opening a client copy of this window -- with plugins    |
++|   that would then run a second time against remote        |
++|   devices -- it sets the event and exits, and this window |
++|   comes forward. See ShowRunningInstance() in             |
++|   startup/main_Windows.cpp, which uses the same name.     |
++|                                                           |
++|   The event's DACL lets the (unelevated) interactive user |
++|   signal it; its label is medium so the elevated creator  |
++|   does not lock a medium-integrity caller out.            |
++\*---------------------------------------------------------*/
++#define OPENRGB_SHOW_WINDOW_EVENT L"Local\\OpenRGB_ShowWindow"
++
++void OpenRGBDialog::StartShowWindowListener()
++{
++#ifdef _WIN32
++    if(show_window_thread)
++    {
++        return;
++    }
++
++    SECURITY_ATTRIBUTES  attributes;
++    PSECURITY_DESCRIPTOR descriptor = NULL;
++
++    if(!ConvertStringSecurityDescriptorToSecurityDescriptorW(
++            L"D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00100002;;;AU)S:(ML;;NW;;;ME)",
++            SDDL_REVISION_1, &descriptor, NULL))
++    {
++        LOG_WARNING("[OpenRGBDialog] Cannot build the show-window event security, error %lu", GetLastError());
++        return;
++    }
++
++    attributes.nLength              = sizeof(attributes);
++    attributes.lpSecurityDescriptor = descriptor;
++    attributes.bInheritHandle       = FALSE;
++
++    HANDLE event = CreateEventW(&attributes, FALSE, FALSE, OPENRGB_SHOW_WINDOW_EVENT);
++    DWORD  error = GetLastError();
++
++    LocalFree(descriptor);
++
++    if(event == NULL || error == ERROR_ALREADY_EXISTS)
++    {
++        /*-------------------------------------------------*\
++        | Another instance already answers to it            |
++        \*-------------------------------------------------*/
++        if(event != NULL)
++        {
++            CloseHandle(event);
++        }
++        return;
++    }
++
++    HANDLE stop = CreateEventW(NULL, TRUE, FALSE, NULL);
++
++    show_window_event  = event;
++    show_window_stop   = stop;
++    show_window_thread = new std::thread([this, event, stop]()
++    {
++        HANDLE handles[2] = { stop, event };
++
++        while(WaitForMultipleObjects(2, handles, FALSE, INFINITE) == WAIT_OBJECT_0 + 1)
++        {
++            QMetaObject::invokeMethod(this, "on_ShowWindowRequested", Qt::QueuedConnection);
++        }
++    });
++#endif
++}
++
++void OpenRGBDialog::StopShowWindowListener()
++{
++#ifdef _WIN32
++    if(show_window_thread)
++    {
++        SetEvent((HANDLE)show_window_stop);
++        show_window_thread->join();
++        delete show_window_thread;
++        show_window_thread = nullptr;
++    }
++
++    if(show_window_event)
++    {
++        CloseHandle((HANDLE)show_window_event);
++        show_window_event = nullptr;
++    }
++
++    if(show_window_stop)
++    {
++        CloseHandle((HANDLE)show_window_stop);
++        show_window_stop = nullptr;
++    }
++#endif
++}
++
++void OpenRGBDialog::on_ShowWindowRequested()
++{
++    if(isHidden())
++    {
++        show();
++    }
++
++    if(isMinimized())
++    {
++        bool maximize = isMaximized();
++        showNormal();
++        if(maximize)
++        {
++            showMaximized();
++        }
++    }
++
++    raise();
++    activateWindow();
++}
++
+ 
+ void OpenRGBDialog::handleAboutToQuit()
+ {
+@@ -1344,6 +1472,15 @@ void OpenRGBDialog::onDetectionEnded()
+         PluginsPage->RefreshList();
+     }
+ 
++    /*-----------------------------------------------------*\
++    | Answer later launches only if this instance detected  |
++    | the devices itself (not a client of another one)      |
++    \*-----------------------------------------------------*/
++    if(ResourceManager::get()->GetDetectionEnabled())
++    {
++        StartShowWindowListener();
++    }
++
+     if(device_view_showing)
+     {
+         ShowLEDView();
+diff --git a/qt/OpenRGBDialog/OpenRGBDialog.h b/qt/OpenRGBDialog/OpenRGBDialog.h
+index 7788d56e..ed747e98 100644
+--- a/qt/OpenRGBDialog/OpenRGBDialog.h
++++ b/qt/OpenRGBDialog/OpenRGBDialog.h
+@@ -10,6 +10,7 @@
+ #pragma once
+ 
+ #include <string>
++#include <thread>
+ #include <QMainWindow>
+ #include <QTimer>
+ #include <QSystemTrayIcon>
+@@ -137,7 +138,20 @@ private:
+     void OnSuspend() override;
+     void OnResume() override;
+ 
++    /*-----------------------------------------------------*\
++    | Single instance (Windows): a second, unelevated       |
++    | launch signals this event and exits, and this window  |
++    | comes forward instead of a client copy opening        |
++    \*-----------------------------------------------------*/
++    void StartShowWindowListener();
++    void StopShowWindowListener();
++
++    void *                          show_window_event   = nullptr;
++    void *                          show_window_stop    = nullptr;
++    std::thread *                   show_window_thread  = nullptr;
++
+ private slots:
++    void on_ShowWindowRequested();
+     void on_Exit();
+     void on_LightsOff();
+     void on_QuickRed();
 diff --git a/startup/main_Windows.cpp b/startup/main_Windows.cpp
-index a7560a91..6b44269b 100644
+index a7560a91..c5b43343 100644
 --- a/startup/main_Windows.cpp
 +++ b/startup/main_Windows.cpp
 @@ -9,6 +9,12 @@
@@ -1217,7 +1527,7 @@ index a7560a91..6b44269b 100644
  {
      /*-----------------------------------------------------*\
      | NtSetTimerResolution function pointer type            |
-@@ -492,14 +511,176 @@ void InitializeTimerResolutionThreadFunction()
+@@ -492,14 +511,242 @@ void InitializeTimerResolutionThreadFunction()
  
      /*-----------------------------------------------------*\
      | Call NtSetTimerResolution to set timer resolution to  |
@@ -1244,8 +1554,9 @@ index a7560a91..6b44269b 100644
 +|   So a plain non-elevated GUI launch first makes sure the |
 +|   elevated server is up -- by running the task, or, if    |
 +|   there is no task, by relaunching itself elevated -- and |
-+|   then attaches to it through the usual local auto-       |
-+|   connect, which shows every device including the RAM.    |
++|   then brings that instance's window forward and exits.   |
++|   Only if the server has no window to show does it fall   |
++|   back to attaching through the usual local auto-connect. |
 +\*---------------------------------------------------------*/
 +#define ELEVATED_SERVER_TASK_NAME   L"OpenRGB (elevated)"
 +
@@ -1273,8 +1584,7 @@ index a7560a91..6b44269b 100644
 +    | probing it: a refused connect to localhost takes ~2 s |
 +    | on Windows, and a successful one is logged by the     |
 +    | server as a dropped client.                           |
-     \*-----------------------------------------------------*/
--    while(1)
++    \*-----------------------------------------------------*/
 +    ULONG                       size    = 0;
 +    std::vector<unsigned char>  buffer;
 +
@@ -1283,12 +1593,10 @@ index a7560a91..6b44269b 100644
 +    size = (ULONG)buffer.size();
 +
 +    if(GetExtendedTcpTable(buffer.data(), &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0) != NO_ERROR)
-     {
--        NtSetTimerResolution(5000, TRUE, &CurrentResolution);
++    {
 +        return(false);
 +    }
- 
--        std::this_thread::sleep_for(500ms);
++
 +    MIB_TCPTABLE_OWNER_PID* table = (MIB_TCPTABLE_OWNER_PID*)buffer.data();
 +
 +    for(DWORD row_idx = 0; row_idx < table->dwNumEntries; row_idx++)
@@ -1297,7 +1605,7 @@ index a7560a91..6b44269b 100644
 +        {
 +            return(true);
 +        }
-     }
++    }
 +
 +    return(false);
 +}
@@ -1345,8 +1653,9 @@ index a7560a91..6b44269b 100644
 +    }
 +
 +    /*-----------------------------------------------------*\
-+    | Also serve the SDK, so the elevated instance can be   |
-+    | the one everything else (Ambilight) talks to          |
++    | Also serve the SDK, so the elevated instance is the   |
++    | one other SDK clients talk to (Ambilight itself now   |
++    | runs inside it as a plugin)                           |
 +    \*-----------------------------------------------------*/
 +    SHELLEXECUTEINFOW exec_info = { };
 +
@@ -1359,31 +1668,98 @@ index a7560a91..6b44269b 100644
 +    return(ShellExecuteExW(&exec_info) == TRUE);
 +}
 +
-+static void EnsureElevatedServer()
++/*---------------------------------------------------------*\
++| Bring the window of the running instance forward          |
++|                                                           |
++|   The instance that owns the devices answers to a named   |
++|   event once its detection is done (see                   |
++|   OpenRGBDialog::StartShowWindowListener, same name).     |
++|   This process was started by the user, so it may hand    |
++|   the foreground to that window before signalling it.     |
++|   False if nothing answers within `timeout_ms` (a server  |
++|   without a window, or an older build): the caller then   |
++|   attaches as a client, as before.                        |
++\*---------------------------------------------------------*/
++static bool ShowRunningInstance(int timeout_ms)
++{
++    for(int waited_ms = 0; ; waited_ms += 100)
++    {
++        HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, L"Local\\OpenRGB_ShowWindow");
++
++        if(event != NULL)
++        {
++            AllowSetForegroundWindow(ASFW_ANY);
++
++            BOOL signalled = SetEvent(event);
++
++            CloseHandle(event);
++            return(signalled != FALSE);
++        }
++
++        if(waited_ms >= timeout_ms)
++        {
++            return(false);
++        }
++
++        std::this_thread::sleep_for(100ms);
++    }
++}
++
++static void EnsureElevatedServer(bool elevated)
 +{
 +    if(IsLocalServerListening(OPENRGB_SDK_PORT))
 +    {
++        /*-------------------------------------------------*\
++        | Already running: show its window rather than a    |
++        | second, client copy of it                         |
++        \*-------------------------------------------------*/
++        if(ShowRunningInstance(3000))
++        {
++            exit(0);
++        }
++
 +        return;
 +    }
 +
 +    if(RunElevatedServerTask())
 +    {
-+        LOG_INFO("[main] Not elevated, started task \"OpenRGB (elevated)\" and attaching to it as a client");
++        LOG_INFO("[main] Plain launch, started task \"OpenRGB (elevated)\"");
 +
 +        for(int wait_idx = 0; wait_idx < 150; wait_idx++)
 +        {
 +            if(IsLocalServerListening(OPENRGB_SDK_PORT))
 +            {
++                /*-----------------------------------------*\
++                | The task starts it minimised to the tray; |
++                | open its window once detection is done    |
++                \*-----------------------------------------*/
++                if(ShowRunningInstance(15000))
++                {
++                    exit(0);
++                }
++
 +                return;
 +            }
 +
 +            std::this_thread::sleep_for(100ms);
 +        }
 +
-+        LOG_WARNING("[main] Task \"OpenRGB (elevated)\" did not start a server, continuing without elevation");
++        LOG_WARNING("[main] Task \"OpenRGB (elevated)\" did not start a server, continuing on our own");
 +        return;
 +    }
 +
++    /*-----------------------------------------------------*\
++    | No task: an elevated launch simply becomes the        |
++    | instance that owns the devices                        |
+     \*-----------------------------------------------------*/
+-    while(1)
++    if(elevated)
+     {
+-        NtSetTimerResolution(5000, TRUE, &CurrentResolution);
++        return;
++    }
+ 
+-        std::this_thread::sleep_for(500ms);
 +    /*-----------------------------------------------------*\
 +    | No task (e.g. the folder was moved and                |
 +    | register-autostart.ps1 not run again): ask for UAC.   |
@@ -1392,27 +1768,29 @@ index a7560a91..6b44269b 100644
 +    if(RelaunchElevated())
 +    {
 +        exit(0);
-+    }
+     }
 +
 +    LOG_WARNING("[main] Not elevated and could not elevate, SMBus devices (RGB RAM) will be missing");
  }
  
  /*---------------------------------------------------------*\
-@@ -563,14 +744,24 @@ static int common_main(int argc, char* argv[])
+@@ -563,14 +810,26 @@ static int common_main(int argc, char* argv[])
          | return flags                                      |
          \*-------------------------------------------------*/
          ret_flags = cli_pre_detection(argc, argv);
 +
 +        /*-------------------------------------------------*\
-+        | A plain double-click launch without admin rights: |
-+        | attach to the elevated server instead of running  |
-+        | detection unelevated                              |
++        | A plain double-click launch: bring the elevated   |
++        | server's window forward instead of running a      |
++        | second copy. Elevated launches too -- OpenRGB.exe |
++        | is marked "Run as administrator" on this PC, and  |
++        | such a launch used to open a client window of its |
++        | own, with every plugin running a second time.     |
 +        \*-------------------------------------------------*/
 +        if((ret_flags & RET_FLAG_START_GUI)
-+        && !(ret_flags & RET_FLAG_NO_AUTO_CONNECT)
-+        && !IsProcessElevated())
++        && !(ret_flags & RET_FLAG_NO_AUTO_CONNECT))
 +        {
-+            EnsureElevatedServer();
++            EnsureElevatedServer(IsProcessElevated());
 +        }
      }
  

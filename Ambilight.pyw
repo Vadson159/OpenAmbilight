@@ -2846,9 +2846,36 @@ def _wants_cli(argv):
     return any(a.split("=", 1)[0] in _CLI_FLAGS for a in argv)
 
 
+# Since 2026-11-22 Ambilight runs inside OpenRGB as a plugin (plugin/ in this
+# repository, installed to OpenRGB-patched\plugins\). This window would drive
+# the same LEDs a second time, so a plain launch hands over to OpenRGB
+# instead; --legacy still opens the old window.
+_OPENRGB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "OpenRGB-patched")
+_PLUGIN_DLL = os.path.join(_OPENRGB_DIR, "plugins", "OpenRGBAmbilightPlugin.dll")
+
+
+def _hand_over_to_openrgb():
+    from tkinter import messagebox
+    root = tk.Tk()
+    root.withdraw()
+    if messagebox.askyesno(
+            "Ambilight",
+            "Ambilight now runs inside OpenRGB: the \"Ambilight\" tab in the OpenRGB "
+            "window, the Ambilight entry in OpenRGB's tray menu, and Ctrl+Alt+A. It "
+            "starts with OpenRGB at logon.\n\nOpen OpenRGB now?"):
+        import subprocess
+        subprocess.Popen([os.path.join(_OPENRGB_DIR, "OpenRGB.exe")], cwd=_OPENRGB_DIR)
+    root.destroy()
+
+
 if __name__ == "__main__":
     if _wants_cli(sys.argv[1:]):
         sys.argv = [a for a in sys.argv if a != "--cli"]
+        if os.path.exists(_PLUGIN_DLL):
+            print("Note: the OpenRGB Ambilight plugin is installed. If it is running "
+                  "(OpenRGB tray > Ambilight), both will drive the LEDs.", flush=True)
         main()
+    elif os.path.exists(_PLUGIN_DLL) and "--legacy" not in sys.argv:
+        _hand_over_to_openrgb()
     else:
         AmbilightGUI().run()

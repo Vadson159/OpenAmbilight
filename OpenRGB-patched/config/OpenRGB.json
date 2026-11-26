@@ -1959,6 +1959,11 @@
                 "description": "Provides a variety of custom effects",
                 "enabled": false,
                 "name": "OpenRGB Effects Plugin"
+            },
+            {
+                "description": "Screen-synced ambient lighting on every OpenRGB device",
+                "enabled": true,
+                "name": "Ambilight"
             }
         ]
     },
