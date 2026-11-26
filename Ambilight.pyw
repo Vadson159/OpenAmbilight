@@ -35,6 +35,7 @@ import time
 import struct
 import ctypes
 import logging
+import locale
 import argparse
 import colorsys
 import threading
@@ -60,6 +61,289 @@ logging.getLogger("openrgb").setLevel(logging.CRITICAL)
 _STARTUP_MODE = "--startup" in sys.argv
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+
+# ===========================================================================
+#  Localization (English / Russian)
+# ===========================================================================
+
+ALGO_KEYS = ("Dominant", "Average", "Center Focus")
+LANG_CODES = ("auto", "en", "ru")
+
+_UI_STRINGS = {
+    "en": {
+        "subtitle": "OpenRGB GPU Screen Sync",
+        "language_label": "Language",
+        "lang_auto": "Auto",
+        "lang_en": "English",
+        "lang_ru": "Русский",
+        "display_label": "Display",
+        "monitor_item": "Monitor {id}  —  {width}×{height}",
+        "display_hint": "Select the monitor to capture colors from.",
+        "fps_label": "Refresh Rate (FPS)",
+        "fps_hint": "How many times per second the screen is analyzed. Default: 15.",
+        "algo_label": "Scanning Algorithm",
+        "algo_Dominant": "Dominant",
+        "algo_Average": "Average",
+        "algo_Center Focus": "Center Focus",
+        "algo_hint": "How the script interprets screen colors.",
+        "bright_label": "Max Brightness (1–100)",
+        "bright_hint": "Limits the maximum brightness sent to the LEDs. Default: 100.",
+        "smooth_label": "Transition Smoothness (1–100)",
+        "smooth_hint": "Higher = snappier. {val} ≈ {ms} ms per colour change. Default: 55.",
+        "min_bright_label": "Min Brightness (0–100)",
+        "min_bright_hint": "LEDs never go below this brightness. 0 = allow full black. Default: 0.",
+        "black_thresh_label": "Black Threshold (1–100)",
+        "black_thresh_hint": "Pixels darker than this are treated as black. Default: 20.",
+        "hotkey_label": "Global Hotkey",
+        "hotkey_none": "None",
+        "hotkey_recording": "Press a key combination...",
+        "hotkey_hint": "Click to map a keyboard shortcut to toggle Ambilight ON/OFF.",
+        "sync_cb": "Sync all devices",
+        "sync_hint": "Shows the same frames on all devices and compensates their delay. Update rate follows the slowest device (~3.6 FPS here). Separate motherboard headers may still differ. Default: on.",
+        "display_sync_cb": "Turn off with display (Windows)",
+        "display_sync_hint": "Disables Ambilight when the monitor goes to sleep or PC is locked.",
+        "edges_cb": "Edge Only",
+        "edges_hint": "Analyzes only the outer 15% of the screen. Gives accurate Ambilight effect at the edges.",
+        "bars_cb": "Skip Black Bars",
+        "bars_hint": "Ignores cinematic letterbox bands so movies don't artificially darken the lighting.",
+        "sat_cb": "Saturation Boost (+50%)",
+        "sat_hint": "Makes colors punchy and vibrant. Great for muted games/movies.",
+        "gamma_cb": "Gamma Correction",
+        "gamma_hint": "Adjusts LED brightness curve to match human perception.",
+        "hdr_cb": "Adaptive Brightness (HDR)",
+        "hdr_hint": "Dims LEDs in dark scenes, flares in bright highlights.",
+        "tray_cb": "Minimize to System Tray",
+        "tray_hint": "When you minimize the window, it hides in the taskbar tray.",
+        "autostart_cb": "Start with Windows",
+        "autostart_hint": "Automatically launches the program hidden in the tray.",
+        "autorun_cb": "Auto-start Ambilight",
+        "autorun_hint": "Automatically starts the Ambilight loop after an 8-second delay (waits for OpenRGB).",
+        "audio_cb": "Audio Visualizer (Music Mode)",
+        "audio_hint": "Stops screen capture and pulses colors to the beat of computer audio.",
+        "sched_start_cb": "Schedule Start",
+        "sched_start_hint": "Automatically starts Ambilight at the chosen time.",
+        "sched_stop_cb": "Schedule Stop",
+        "sched_stop_hint": "Automatically stops Ambilight at the chosen time.",
+        "btn_start": "▶  START",
+        "btn_stop": "⏹  STOP",
+        "status_stopped": "Stopped",
+        "status_connecting": "Connecting to OpenRGB…",
+        "status_waiting_server": "Waiting for OpenRGB SDK server... {sec}s left",
+        "status_waiting_devices": "Waiting for OpenRGB devices... ({count} found)",
+        "status_running": "Running  •  {devs}{extra}",
+        "feat_edges": "edges",
+        "feat_bars": "skip-bars",
+        "feat_audio": "audio",
+        "err_select_monitor": "Error: select a monitor",
+        "err_fps": "Error: FPS must be > 0",
+        "err_sdk_not_found": "OpenRGB SDK Server not found.",
+        "err_sdk_unreachable": "OpenRGB SDK server not reachable on {host}:{port} - start OpenRGB and enable its SDK Server.",
+        "err_startup": "Startup failed: {error}",
+        "err_stopped": "Stopped: {error}",
+        "status_autorun_wait": "Auto-start in {sec}s (waiting for OpenRGB)…",
+        "status_autorun_go": "Auto-starting Ambilight…",
+        "tray_show": "Show Ambilight",
+        "tray_exit": "Exit",
+        "handover_msg": (
+            "Ambilight now runs inside OpenRGB: the \"Ambilight\" tab in the OpenRGB "
+            "window, the Ambilight entry in OpenRGB's tray menu, and Ctrl+Alt+A. It "
+            "starts with OpenRGB at logon.\n\nOpen OpenRGB now?"
+        ),
+        "cli_plugin_note": (
+            "Note: the OpenRGB Ambilight plugin is installed. If it is running "
+            "(OpenRGB tray > Ambilight), both will drive the LEDs."
+        ),
+        "cli_connecting": "Connecting to OpenRGB…",
+        "cli_error": "ERROR: {error}",
+        "cli_stopping": "\nStopping…",
+        "cli_restored": "Devices restored to default mode.",
+        "cli_no_monitors": "ERROR: No monitors detected.",
+        "cli_list_header": "OpenRGB SDK — {devs}:\n",
+        "cli_list_zone": "       zone: {name}  ({leds} LEDs)",
+        "cli_list_hid_header": "\nDirect HID (bypassing OpenRGB):",
+        "cli_list_hid_xpg": "  XPG Summoner Gaming Keyboard  (feature-report control)",
+        "cli_list_monitors": "\nMonitors (mss):",
+        "cli_started": "Ambilight started  |  {width}x{height}  |  capture: {backend}",
+        "cli_started_meta": "  Devices: {count}  |  FPS: {fps}  |  Brightness: {brightness}%",
+        "cli_started_features": "  Features: {features}",
+        "cli_started_tuning": "  Priority: below-normal + EcoQoS  |  GC: manual  |  Smooth: {smooth}%",
+        "cli_ctrl_c": "  Ctrl+C to stop\n",
+        "cli_test_done": "Done!",
+    },
+    "ru": {
+        "subtitle": "Синхронизация подсветки OpenRGB с экраном",
+        "language_label": "Язык",
+        "lang_auto": "Авто",
+        "lang_en": "English",
+        "lang_ru": "Русский",
+        "display_label": "Монитор",
+        "monitor_item": "Монитор {id}  —  {width}×{height}",
+        "display_hint": "Выберите монитор для захвата цветов.",
+        "fps_label": "Частота обновления (FPS)",
+        "fps_hint": "Сколько раз в секунду анализируется экран. По умолчанию: 15.",
+        "algo_label": "Алгоритм анализа",
+        "algo_Dominant": "Доминирующий цвет",
+        "algo_Average": "Средний цвет",
+        "algo_Center Focus": "Центр экрана",
+        "algo_hint": "Как программа вычисляет цвет экрана.",
+        "bright_label": "Макс. яркость (1–100)",
+        "bright_hint": "Ограничивает максимальную яркость подсветки. По умолчанию: 100.",
+        "smooth_label": "Плавность переходов (1–100)",
+        "smooth_hint": "Больше — быстрее. {val} ≈ {ms} мс на смену цвета. По умолчанию: 55.",
+        "min_bright_label": "Мин. яркость (0–100)",
+        "min_bright_hint": "Подсветка не становится темнее. 0 — можно погасить полностью. По умолчанию: 0.",
+        "black_thresh_label": "Порог чёрного (1–100)",
+        "black_thresh_hint": "Пиксели темнее этого считаются чёрными. По умолчанию: 20.",
+        "hotkey_label": "Горячая клавиша",
+        "hotkey_none": "Нет",
+        "hotkey_recording": "Нажмите сочетание клавиш...",
+        "hotkey_hint": "Нажмите, чтобы задать клавиши для включения/выключения Ambilight.",
+        "sync_cb": "Синхронизировать устройства",
+        "sync_hint": "Все устройства показывают одни и те же кадры с поправкой на задержку каждого. Частота обновления — по самому медленному (~3,6 FPS здесь). Разные разъёмы материнской платы могут немного расходиться. По умолчанию: вкл.",
+        "display_sync_cb": "Выключать вместе с дисплеем (Windows)",
+        "display_sync_hint": "Выключает подсветку, когда монитор спит или ПК заблокирован.",
+        "edges_cb": "Только края",
+        "edges_hint": "Анализирует только внешние 15% экрана. Точный эффект Ambilight по краям.",
+        "bars_cb": "Пропускать чёрные полосы",
+        "bars_hint": "Не учитывает чёрные полосы фильмов, чтобы они не затемняли подсветку.",
+        "sat_cb": "Усилить насыщенность (+50%)",
+        "sat_hint": "Делает цвета ярче и сочнее. Подходит для приглушённых игр и фильмов.",
+        "gamma_cb": "Гамма-коррекция",
+        "gamma_hint": "Корректирует кривую яркости диодов под восприятие глаза.",
+        "hdr_cb": "Адаптивная яркость (HDR)",
+        "hdr_hint": "Приглушает подсветку в тёмных сценах и усиливает в ярких.",
+        "tray_cb": "Сворачивать в трей",
+        "tray_hint": "При сворачивании окно прячется в область уведомлений.",
+        "autostart_cb": "Запускать с Windows",
+        "autostart_hint": "Автоматически запускает программу свёрнутой в трей.",
+        "autorun_cb": "Автозапуск Ambilight",
+        "autorun_hint": "Автоматически включает Ambilight через 8 секунд (ждёт OpenRGB).",
+        "audio_cb": "Музыкальный режим (визуализатор звука)",
+        "audio_hint": "Вместо захвата экрана подсветка пульсирует в такт звуку компьютера.",
+        "sched_start_cb": "Включать по расписанию",
+        "sched_start_hint": "Автоматически включает Ambilight в указанное время.",
+        "sched_stop_cb": "Выключать по расписанию",
+        "sched_stop_hint": "Автоматически выключает Ambilight в указанное время.",
+        "btn_start": "▶  СТАРТ",
+        "btn_stop": "⏹  СТОП",
+        "status_stopped": "Остановлено",
+        "status_connecting": "Подключение к OpenRGB…",
+        "status_waiting_server": "Ожидание SDK-сервера OpenRGB… осталось {sec} с",
+        "status_waiting_devices": "Ожидание устройств OpenRGB… (найдено: {count})",
+        "status_running": "Работает  •  {devs}{extra}",
+        "feat_edges": "края",
+        "feat_bars": "без полос",
+        "feat_audio": "музыка",
+        "err_select_monitor": "Ошибка: выберите монитор",
+        "err_fps": "Ошибка: FPS должен быть > 0",
+        "err_sdk_not_found": "SDK-сервер OpenRGB не найден.",
+        "err_sdk_unreachable": "SDK-сервер OpenRGB недоступен на {host}:{port} — запустите OpenRGB и включите SDK Server.",
+        "err_startup": "Ошибка запуска: {error}",
+        "err_stopped": "Остановлено: {error}",
+        "status_autorun_wait": "Автозапуск через {sec} с (ожидание OpenRGB)…",
+        "status_autorun_go": "Автозапуск Ambilight…",
+        "tray_show": "Показать Ambilight",
+        "tray_exit": "Выход",
+        "handover_msg": (
+            "Ambilight теперь работает внутри OpenRGB: вкладка «Ambilight» в окне "
+            "OpenRGB, пункт Ambilight в меню трея OpenRGB и сочетание Ctrl+Alt+A. Он "
+            "запускается вместе с OpenRGB при входе в систему.\n\nОткрыть OpenRGB сейчас?"
+        ),
+        "cli_plugin_note": (
+            "Примечание: установлен плагин OpenRGB Ambilight. Если он запущен "
+            "(трей OpenRGB > Ambilight), подсветкой будут управлять оба экземпляра."
+        ),
+        "cli_connecting": "Подключение к OpenRGB…",
+        "cli_error": "ОШИБКА: {error}",
+        "cli_stopping": "\nОстановка…",
+        "cli_restored": "Устройства возвращены в режим по умолчанию.",
+        "cli_no_monitors": "ОШИБКА: мониторы не обнаружены.",
+        "cli_list_header": "OpenRGB SDK — {devs}:\n",
+        "cli_list_zone": "       зона: {name}  ({leds} светодиодов)",
+        "cli_list_hid_header": "\nПрямой HID (в обход OpenRGB):",
+        "cli_list_hid_xpg": "  XPG Summoner Gaming Keyboard  (управление через feature-report)",
+        "cli_list_monitors": "\nМониторы (mss):",
+        "cli_started": "Ambilight запущен  |  {width}x{height}  |  захват: {backend}",
+        "cli_started_meta": "  Устройства: {count}  |  FPS: {fps}  |  Яркость: {brightness}%",
+        "cli_started_features": "  Функции: {features}",
+        "cli_started_tuning": "  Приоритет: ниже обычного + EcoQoS  |  GC: ручной  |  Плавность: {smooth}%",
+        "cli_ctrl_c": "  Нажмите Ctrl+C для остановки\n",
+        "cli_test_done": "Готово!",
+    },
+}
+
+
+def normalize_language(value):
+    """Normalize a language preference to 'auto', 'en', or 'ru'."""
+    if not isinstance(value, str):
+        return "auto"
+    raw = value.strip()
+    low = raw.lower()
+    if low in ("en", "en_us", "en-us", "english"):
+        return "en"
+    if low in ("ru", "ru_ru", "ru-ru", "russian") or raw.startswith("Рус") or low.startswith("рус"):
+        return "ru"
+    return "auto"
+
+
+def detect_system_language():
+    """Return 'ru' on Russian UI locales, 'en' otherwise."""
+    try:
+        lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        if (lang_id & 0x3FF) == 0x19:   # LANG_RUSSIAN
+            return "ru"
+        return "en"
+    except Exception:
+        pass
+    for candidate in (locale.getlocale()[0], os.environ.get("LC_ALL"), os.environ.get("LANG")):
+        if candidate and str(candidate).lower().startswith("ru"):
+            return "ru"
+    return "en"
+
+
+def resolve_language(setting="auto"):
+    """Resolve 'auto'/'en'/'ru' to the concrete UI language 'en' or 'ru'."""
+    norm = normalize_language(setting)
+    if norm == "auto":
+        return detect_system_language()
+    return norm
+
+
+def format_device_count(count, lang="en"):
+    """Format a device count with English or Russian pluralization."""
+    resolved = resolve_language(lang)
+    if resolved != "ru":
+        return f"{count} device" if count == 1 else f"{count} devices"
+    mod100 = count % 100
+    mod10 = count % 10
+    if 11 <= mod100 <= 14:
+        word = "устройств"
+    elif mod10 == 1:
+        word = "устройство"
+    elif 2 <= mod10 <= 4:
+        word = "устройства"
+    else:
+        word = "устройств"
+    return f"{count} {word}"
+
+
+def tr(lang, key, **kwargs):
+    """Look up a localized string for `lang` ('auto', 'en', or 'ru')."""
+    resolved = resolve_language(lang)
+    text = _UI_STRINGS.get(resolved, _UI_STRINGS["en"]).get(key, _UI_STRINGS["en"].get(key, key))
+    return text.format(**kwargs) if kwargs else text
+
+
+def _read_config_language(path=CONFIG_FILE):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and "language" in data:
+            return normalize_language(data["language"])
+    except Exception:
+        pass
+    return "auto"
 
 
 # ===========================================================================
@@ -1322,10 +1606,11 @@ class AsyncColorSender:
 class Ambilight:
     def __init__(self, fps=15, brightness=100,
                  connect_timeout=OPENRGB_CONNECT_TIMEOUT, status_cb=None,
-                 sync_devices=True):
+                 sync_devices=True, lang="auto"):
         import time as _time
-        self.client = self._connect(timeout=connect_timeout, status_cb=status_cb)
-        self.devices = self._wait_for_devices(status_cb=status_cb)
+        self.lang = resolve_language(lang)
+        self.client = self._connect(timeout=connect_timeout, status_cb=status_cb, lang=self.lang)
+        self.devices = self._wait_for_devices(status_cb=status_cb, lang=self.lang)
 
         # Direct mode is what makes per-frame colour control possible. set_mode()
         # costs a blocking round trip and, on motherboards and fan hubs, a
@@ -1381,7 +1666,7 @@ class Ambilight:
         return False
 
     @staticmethod
-    def _connect(timeout=OPENRGB_CONNECT_TIMEOUT, status_cb=None):
+    def _connect(timeout=OPENRGB_CONNECT_TIMEOUT, status_cb=None, lang="auto"):
         """Connect to the OpenRGB SDK server, waiting for it to come up.
 
         A single attempt fails after ~1 s if nothing is listening yet, which is
@@ -1406,17 +1691,16 @@ class Ambilight:
             remaining = deadline - time.time()
             if remaining <= 0:
                 raise OpenRGBUnavailable(
-                    "OpenRGB SDK server not reachable on "
-                    "%s:%d - start OpenRGB and enable its SDK Server."
-                    % (OPENRGB_HOST, OPENRGB_PORT)) from last_err
+                    tr(lang, "err_sdk_unreachable", host=OPENRGB_HOST, port=OPENRGB_PORT)
+                ) from last_err
             now = time.time()
             if now - last_notice >= 5.0:
                 last_notice = now
                 _notify(status_cb,
-                        "Waiting for OpenRGB SDK server... %ds left" % int(remaining))
+                        tr(lang, "status_waiting_server", sec=int(remaining)))
             time.sleep(min(1.0, remaining))
 
-    def _wait_for_devices(self, timeout=OPENRGB_DEVICE_TIMEOUT, status_cb=None):
+    def _wait_for_devices(self, timeout=OPENRGB_DEVICE_TIMEOUT, status_cb=None, lang=None):
         """Wait until OpenRGB has finished enumerating its devices.
 
         The SDK server accepts connections *before* detection is done (SMBus /
@@ -1429,6 +1713,7 @@ class Ambilight:
         """
         POLL = 0.15
         STABLE_SAMPLES = 2
+        ui_lang = getattr(self, "lang", "en") if lang is None else lang
         deadline = time.time() + max(0.0, timeout)
         devices = list(self.client.devices)
         stable = 0
@@ -1439,7 +1724,7 @@ class Ambilight:
             if notified != len(devices):
                 notified = len(devices)
                 _notify(status_cb,
-                        "Waiting for OpenRGB devices... (%d found)" % len(devices))
+                        tr(ui_lang, "status_waiting_devices", count=len(devices)))
             time.sleep(POLL)
             try:
                 self.client.update()
@@ -1447,23 +1732,23 @@ class Ambilight:
             except Exception:
                 # Server went away mid-detection (OpenRGB restarting) -- reconnect.
                 self.client = self._connect(timeout=max(1.0, deadline - time.time()),
-                                            status_cb=status_cb)
+                                            status_cb=status_cb, lang=ui_lang)
                 fresh = list(self.client.devices)
             stable = stable + 1 if len(fresh) == len(devices) else 0
             devices = fresh
         return devices
 
     def list_devices(self, monitors=None):
-        print(f"OpenRGB SDK — {len(self.devices)} device(s):\n")
+        print(tr(self.lang, "cli_list_header", devs=format_device_count(len(self.devices), self.lang)))
         for dev in self.devices:
             print(f"  [{dev.id}] {dev.name}  ({dev.type.name})")
             for z in dev.zones:
-                print(f"       zone: {z.name}  ({len(z.leds)} LEDs)")
+                print(tr(self.lang, "cli_list_zone", name=z.name, leds=len(z.leds)))
         if self.keyboard is not None and self.keyboard.available:
-            print("\nDirect HID (bypassing OpenRGB):")
-            print("  XPG Summoner Gaming Keyboard  (feature-report control)")
+            print(tr(self.lang, "cli_list_hid_header"))
+            print(tr(self.lang, "cli_list_hid_xpg"))
         if monitors:
-            print("\nMonitors (mss):")
+            print(tr(self.lang, "cli_list_monitors"))
             for m in monitors:
                 print(f"  [{m['id']}] {m['width']}x{m['height']}")
         print()
@@ -1491,7 +1776,7 @@ class Ambilight:
                     dev.set_mode(0)
             except Exception:
                 pass
-        print("Devices restored to default mode.")
+        print(tr(self.lang, "cli_restored"))
 
     def run(self, monitor_index=None, preferred_width=2560,
             edge_only=False, skip_bars=False, smoothness=35, display_sync=True):
@@ -1500,7 +1785,7 @@ class Ambilight:
 
         monitors = get_monitors()
         if not monitors:
-            print("ERROR: No monitors detected.")
+            print(tr(self.lang, "cli_no_monitors"))
             sys.exit(1)
 
         if monitor_index is not None:
@@ -1516,14 +1801,14 @@ class Ambilight:
         RAW_WAKE_THRESHOLD = 15
 
         flags = []
-        if edge_only: flags.append("edges")
-        if skip_bars: flags.append("skip-bars")
-        print(f"Ambilight started  |  {mon['width']}x{mon['height']}  |  capture: {grabber.backend}", flush=True)
-        print(f"  Devices: {len(self.devices)}  |  FPS: {self.fps}  |  Brightness: {int(self.brightness*100)}%", flush=True)
+        if edge_only: flags.append(tr(self.lang, "feat_edges"))
+        if skip_bars: flags.append(tr(self.lang, "feat_bars"))
+        print(tr(self.lang, "cli_started", width=mon["width"], height=mon["height"], backend=grabber.backend), flush=True)
+        print(tr(self.lang, "cli_started_meta", count=len(self.devices), fps=self.fps, brightness=int(self.brightness * 100)), flush=True)
         if flags:
-            print(f"  Features: {', '.join(flags)}", flush=True)
-        print(f"  Priority: below-normal + EcoQoS  |  GC: manual  |  Smooth: {smoothness}%", flush=True)
-        print(f"  Ctrl+C to stop\n", flush=True)
+            print(tr(self.lang, "cli_started_features", features=", ".join(flags)), flush=True)
+        print(tr(self.lang, "cli_started_tuning", smooth=smoothness), flush=True)
+        print(tr(self.lang, "cli_ctrl_c"), flush=True)
 
         prev = None
         prev_raw = None
@@ -1679,7 +1964,7 @@ class Ambilight:
             time.sleep(max(1.0, sender._frame_period + sender._slowest))
         finally:
             sender.stop()
-        print("Done!")
+        print(tr(self.lang, "cli_test_done"))
 
 
 # ---------------------------------------------------------------------------
@@ -1703,17 +1988,22 @@ def main():
                              "(default: on; --no-sync uses independent updates)")
     parser.add_argument("--wait",       type=float, default=OPENRGB_CONNECT_TIMEOUT,
                         help="seconds to wait for the OpenRGB SDK server")
+    parser.add_argument("--lang",       choices=["auto", "en", "ru"], default=None,
+                        help="interface language: auto, en, or ru")
     args = parser.parse_args()
+
+    lang = resolve_language(args.lang if args.lang is not None else _read_config_language())
 
     logging.getLogger("openrgb").setLevel(logging.CRITICAL)
 
-    print("Connecting to OpenRGB…", flush=True)
+    print(tr(lang, "cli_connecting"), flush=True)
     try:
         ambi = Ambilight(fps=args.fps, brightness=args.brightness,
                          sync_devices=args.sync,
-                         connect_timeout=args.wait)
+                         connect_timeout=args.wait,
+                         lang=lang)
     except OpenRGBUnavailable as exc:
-        print("ERROR: %s" % exc)
+        print(tr(lang, "cli_error", error=exc))
         sys.exit(1)
 
     if args.list:
@@ -1725,7 +2015,7 @@ def main():
 
     import signal
     def _quit(sig=None, frame=None):
-        print("\nStopping…", flush=True)
+        print(tr(lang, "cli_stopping"), flush=True)
         ambi.stop()
     signal.signal(signal.SIGINT, _quit)
     signal.signal(signal.SIGTERM, _quit)
@@ -1866,6 +2156,7 @@ class AmbilightGUI:
         self.monitors = get_monitors()
 
         self.config = {
+            "language": "auto",
             "monitor": 0,
             "fps": "60",
             "brightness": 100,
@@ -1913,14 +2204,60 @@ class AmbilightGUI:
         self._bar_shown = None
         self._bar_job = None
         self._hotkey = None
+        self._loading_ui = False
+        self._recording_hotkey = False
+        self._status_state = ("status_stopped", {})
+        self._raw_status_text = None
 
         self._load_config()
+        self.lang_setting = normalize_language(self.config.get("language", "auto"))
+        cli_lang = _parse_lang_arg(sys.argv[1:])
+        if cli_lang is not None:
+            self.lang_setting = normalize_language(cli_lang)
+        self.lang = resolve_language(self.lang_setting)
+        self._hotkey_value = self.config.get("hotkey", "None") or "None"
+        if self.config.get("algo") not in ALGO_KEYS:
+            self.config["algo"] = "Dominant"
+        self.live_algo = self.config["algo"]
 
         self._build_ui()
         self._center_window()
 
         self._kb_hooked = False     # the keyboard-hook fallback is in use
-        self._bind_hotkey(self.config.get("hotkey", "None"))
+        self._bind_hotkey(self._hotkey_value)
+
+    def _t(self, key, **kwargs):
+        return tr(self.lang, key, **kwargs)
+
+    def _set_status(self, key, **kwargs):
+        self._status_state = (key, kwargs)
+        self._raw_status_text = None
+        if hasattr(self, "status_var"):
+            self.status_var.set(self._t(key, **kwargs))
+
+    def _refresh_status_text(self):
+        if not hasattr(self, "status_var"):
+            return
+        if self.running:
+            devs = len(self.ambilight.devices) if self.ambilight else 0
+            feats = []
+            if self.live_edges: feats.append(self._t("feat_edges"))
+            if self.live_bars: feats.append(self._t("feat_bars"))
+            if self.live_audio: feats.append(self._t("feat_audio"))
+            extra = f"  •  {', '.join(feats)}" if feats else ""
+            self.status_var.set(self._t("status_running", devs=format_device_count(devs, self.lang), extra=extra))
+        elif self._raw_status_text is not None:
+            self.status_var.set(self._raw_status_text)
+        else:
+            key, kwargs = self._status_state
+            self.status_var.set(self._t(key, **kwargs))
+
+    def _format_hotkey_label(self):
+        if self._recording_hotkey:
+            return self._t("hotkey_recording")
+        if not self._hotkey_value or self._hotkey_value == "None":
+            return self._t("hotkey_none")
+        return self._hotkey_value
 
     def _bind_hotkey(self, hk):
         """Make `hk` toggle Start/Stop, replacing whatever was bound before."""
@@ -1962,12 +2299,25 @@ class AmbilightGUI:
             return
         try:
             self.smooth_hint_var.set(
-                "Higher = snappier. %d ≈ %d ms per colour change. Default: 55."
-                % (self.live_smooth, round(smooth_settle_ms(self.live_smooth))))
+                self._t("smooth_hint", val=self.live_smooth,
+                        ms=round(smooth_settle_ms(self.live_smooth))))
         except Exception:
             pass
 
+    def _on_language_change(self, *args):
+        if self._loading_ui:
+            return
+        idx = self.lang_combo.current()
+        code = LANG_CODES[idx] if 0 <= idx < len(LANG_CODES) else "auto"
+        self.lang_setting = code
+        self.lang = resolve_language(code)
+        self.config["language"] = code
+        self._apply_language()
+        self._save_config()
+
     def _on_setting_change(self, *args):
+        if self._loading_ui:
+            return
         try:
             val = float(self.fps_var.get())
             if 0 < val <= 240:
@@ -1996,23 +2346,28 @@ class AmbilightGUI:
         self.live_sat = self.sat_var.get()
         self.live_gamma = self.gamma_var.get()
         self.live_hdr = self.hdr_var.get()
-        self.live_algo = self.algo_var.get()
+        algo_idx = self.algo_combo.current()
+        if 0 <= algo_idx < len(ALGO_KEYS):
+            self.live_algo = ALGO_KEYS[algo_idx]
         self.live_tray = self.tray_var.get()
         self.live_audio = self.audio_var.get()
         self.live_sync = self.sync_var.get()
         self.live_display_sync = self.display_sync_var.get()
+        if self.running:
+            self._refresh_status_text()
         self._save_config()
 
     def _load_config(self):
         if os.path.exists(CONFIG_FILE):
             try:
-                with open(CONFIG_FILE, "r") as f:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     self.config.update(json.load(f))
             except Exception:
                 pass
 
     def _save_config(self):
         try:
+            self.config["language"] = self.lang_setting
             self.config["monitor"] = self.monitor_combo.current()
             self.config["fps"] = self.fps_var.get()
             self.config["brightness"] = self.live_bright
@@ -2024,22 +2379,22 @@ class AmbilightGUI:
             self.config["saturation"] = self.sat_var.get()
             self.config["gamma"] = self.gamma_var.get()
             self.config["hdr"] = self.hdr_var.get()
-            self.config["algo"] = self.algo_var.get()
+            self.config["algo"] = self.live_algo
             self.config["tray"] = self.tray_var.get()
             self.config["audio"] = self.audio_var.get()
             self.config["display_sync"] = self.display_sync_var.get()
             self.config["sync_devices"] = self.sync_var.get()
             self.config["autostart"] = self.auto_var.get()
             self.config["autorun"] = self.autorun_var.get()
-            self.config["hotkey"] = self.hotkey_var.get()
+            self.config["hotkey"] = self._hotkey_value
             self.config["schedule_start_enabled"] = self.sched_start_var.get()
             self.config["schedule_start_h"] = self.sched_start_h_var.get()
             self.config["schedule_start_m"] = self.sched_start_m_var.get()
             self.config["schedule_stop_enabled"] = self.sched_stop_var.get()
             self.config["schedule_stop_h"] = self.sched_stop_h_var.get()
             self.config["schedule_stop_m"] = self.sched_stop_m_var.get()
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(self.config, f)
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, ensure_ascii=False)
         except Exception:
             pass
 
@@ -2064,7 +2419,8 @@ class AmbilightGUI:
         self._save_config()
 
     def _record_hotkey(self):
-        self.hotkey_var.set("Press a key combination...")
+        self._recording_hotkey = True
+        self.hotkey_var.set(self._format_hotkey_label())
         self.hotkey_btn.config(bg="#e94560", fg="#ffffff")
         self.root.update()
         # A registered hotkey is swallowed by Windows; let the recorder see it.
@@ -2083,15 +2439,112 @@ class AmbilightGUI:
         threading.Thread(target=listen, daemon=True).start()
 
     def _set_hotkey(self, hk):
+        self._recording_hotkey = False
         self.hotkey_btn.config(bg="#16213e", fg="#4ecca3")
         if hk and "unknown" not in hk.lower():
-            self.hotkey_var.set(hk)
+            self._hotkey_value = hk
             self.config["hotkey"] = hk
+            self.hotkey_var.set(self._format_hotkey_label())
             self._bind_hotkey(hk)
             self._save_config()
         else:
-            self.hotkey_var.set(self.config.get("hotkey", "None"))
-            self._bind_hotkey(self.config.get("hotkey", "None"))
+            self._hotkey_value = self.config.get("hotkey", "None") or "None"
+            self.hotkey_var.set(self._format_hotkey_label())
+            self._bind_hotkey(self._hotkey_value)
+
+    def _apply_language(self):
+        """Update all visible UI texts to the currently selected language."""
+        self._loading_ui = True
+        try:
+            self.subtitle_lbl.config(text=self._t("subtitle"))
+            self.lang_lbl.config(text=self._t("language_label"))
+            lang_labels = [self._t("lang_auto"), self._t("lang_en"), self._t("lang_ru")]
+            self.lang_combo.config(values=lang_labels)
+            self.lang_combo.current(LANG_CODES.index(self.lang_setting))
+
+            self.display_lbl.config(text=self._t("display_label"))
+            mon_idx = self.monitor_combo.current()
+            mon_names = [self._t("monitor_item", id=m["id"], width=m["width"], height=m["height"])
+                         for m in self.monitors]
+            self.monitor_combo.config(values=mon_names)
+            if mon_names:
+                if mon_idx < 0 or mon_idx >= len(mon_names):
+                    mon_idx = self.config.get("monitor", 0)
+                    if mon_idx < 0 or mon_idx >= len(mon_names):
+                        mon_idx = 0
+                self.monitor_combo.current(mon_idx)
+            self.display_hint_lbl.config(text=self._t("display_hint"))
+
+            self.fps_lbl.config(text=self._t("fps_label"))
+            self.fps_hint_lbl.config(text=self._t("fps_hint"))
+
+            self.algo_lbl.config(text=self._t("algo_label"))
+            algo_labels = [self._t(f"algo_{k}") for k in ALGO_KEYS]
+            self.algo_combo.config(values=algo_labels)
+            algo_idx = ALGO_KEYS.index(self.live_algo) if self.live_algo in ALGO_KEYS else 0
+            self.algo_combo.current(algo_idx)
+            self.algo_hint_lbl.config(text=self._t("algo_hint"))
+
+            self.bright_lbl.config(text=self._t("bright_label"))
+            self.bright_hint_lbl.config(text=self._t("bright_hint"))
+
+            self.smooth_lbl.config(text=self._t("smooth_label"))
+            self._update_smooth_hint()
+
+            self.min_bright_lbl.config(text=self._t("min_bright_label"))
+            self.min_bright_hint_lbl.config(text=self._t("min_bright_hint"))
+
+            self.black_thresh_lbl.config(text=self._t("black_thresh_label"))
+            self.black_thresh_hint_lbl.config(text=self._t("black_thresh_hint"))
+
+            self.hotkey_lbl.config(text=self._t("hotkey_label"))
+            self.hotkey_var.set(self._format_hotkey_label())
+            self.hotkey_hint_lbl.config(text=self._t("hotkey_hint"))
+
+            self.sync_cb.config(text=self._t("sync_cb"))
+            self.sync_hint_lbl.config(text=self._t("sync_hint"))
+
+            self.display_sync_cb.config(text=self._t("display_sync_cb"))
+            self.display_sync_hint_lbl.config(text=self._t("display_sync_hint"))
+
+            self.edge_cb.config(text=self._t("edges_cb"))
+            self.edge_hint_lbl.config(text=self._t("edges_hint"))
+
+            self.bars_cb.config(text=self._t("bars_cb"))
+            self.bars_hint_lbl.config(text=self._t("bars_hint"))
+
+            self.sat_cb.config(text=self._t("sat_cb"))
+            self.sat_hint_lbl.config(text=self._t("sat_hint"))
+
+            self.gamma_cb.config(text=self._t("gamma_cb"))
+            self.gamma_hint_lbl.config(text=self._t("gamma_hint"))
+
+            self.hdr_cb.config(text=self._t("hdr_cb"))
+            self.hdr_hint_lbl.config(text=self._t("hdr_hint"))
+
+            self.tray_cb.config(text=self._t("tray_cb"))
+            self.tray_hint_lbl.config(text=self._t("tray_hint"))
+
+            self.auto_cb.config(text=self._t("autostart_cb"))
+            self.auto_hint_lbl.config(text=self._t("autostart_hint"))
+
+            self.autorun_cb.config(text=self._t("autorun_cb"))
+            self.autorun_hint_lbl.config(text=self._t("autorun_hint"))
+
+            self.audio_cb.config(text=self._t("audio_cb"))
+            self.audio_hint_lbl.config(text=self._t("audio_hint"))
+
+            self.sched_start_cb.config(text=self._t("sched_start_cb"))
+            self.sched_start_hint_lbl.config(text=self._t("sched_start_hint"))
+
+            self.sched_stop_cb.config(text=self._t("sched_stop_cb"))
+            self.sched_stop_hint_lbl.config(text=self._t("sched_stop_hint"))
+
+            self.btn.config(text=self._t("btn_stop") if self.running else self._t("btn_start"))
+            self._refresh_status_text()
+        finally:
+            self._loading_ui = False
+        self.root.update_idletasks()
 
     def _build_ui(self):
         style = ttk.Style()
@@ -2107,8 +2560,23 @@ class AmbilightGUI:
         main_container = tk.Frame(self.root, bg="#1a1a2e", padx=30, pady=20)
         main_container.pack(fill="both", expand=True)
 
-        ttk.Label(main_container, text="⬤ Ambilight", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(main_container, text="OpenRGB GPU Screen Sync", style="Sub.TLabel").pack(anchor="w", pady=(0, 20))
+        header_frame = tk.Frame(main_container, bg="#1a1a2e")
+        header_frame.pack(fill="x")
+
+        title_frame = tk.Frame(header_frame, bg="#1a1a2e")
+        title_frame.pack(side="left", anchor="w")
+        ttk.Label(title_frame, text="⬤ Ambilight", style="Title.TLabel").pack(anchor="w")
+        self.subtitle_lbl = ttk.Label(title_frame, text="", style="Sub.TLabel")
+        self.subtitle_lbl.pack(anchor="w", pady=(0, 20))
+
+        lang_frame = tk.Frame(header_frame, bg="#1a1a2e")
+        lang_frame.pack(side="right", anchor="ne", pady=(6, 0))
+        self.lang_lbl = ttk.Label(lang_frame, text="", style="Field.TLabel")
+        self.lang_lbl.pack(side="left", padx=(0, 8))
+        self.lang_var = tk.StringVar()
+        self.lang_combo = ttk.Combobox(lang_frame, textvariable=self.lang_var, state="readonly", width=12, font=("Segoe UI", 9))
+        self.lang_combo.pack(side="left")
+        self.lang_combo.bind("<<ComboboxSelected>>", self._on_language_change)
 
         content_frame = tk.Frame(main_container, bg="#1a1a2e")
         content_frame.pack(fill="both", expand=True)
@@ -2120,125 +2588,147 @@ class AmbilightGUI:
         right_col.pack(side="left", fill="both", expand=True, padx=(15, 0))
 
         # -- Monitor
-        ttk.Label(left_col, text="Display", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
-        names = [f"Monitor {m['id']}  —  {m['width']}×{m['height']}" for m in self.monitors]
+        self.display_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.display_lbl.pack(anchor="w", pady=(0, 4))
         self.monitor_var = tk.StringVar()
-        self.monitor_combo = ttk.Combobox(left_col, textvariable=self.monitor_var, values=names, state="readonly", width=30, font=("Segoe UI", 10))
+        self.monitor_combo = ttk.Combobox(left_col, textvariable=self.monitor_var, state="readonly", width=30, font=("Segoe UI", 10))
         self.monitor_combo.pack(anchor="w", pady=(0, 2), ipady=4)
-        if names:
-            idx = self.config.get("monitor", 0)
-            if idx >= len(names) or idx < 0: idx = 0
-            self.monitor_combo.current(idx)
-        ttk.Label(left_col, text="Select the monitor to capture colors from.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.monitor_combo.bind("<<ComboboxSelected>>", self._on_setting_change)
+        self.display_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.display_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- FPS
-        ttk.Label(left_col, text="Refresh Rate (FPS)", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
+        self.fps_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.fps_lbl.pack(anchor="w", pady=(0, 4))
         self.fps_var = tk.StringVar(value=str(self.config.get("fps", "60")))
         self.fps_entry = tk.Entry(left_col, textvariable=self.fps_var, bg="#16213e", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 10), width=10, relief="flat", bd=0, highlightthickness=1, highlightbackground="#333355", highlightcolor="#4ecca3")
         self.fps_entry.pack(anchor="w", pady=(0, 2), ipady=6, ipadx=6)
-        ttk.Label(left_col, text="How many times per second the screen is analyzed. Default: 15.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.fps_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.fps_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Scanning Algorithm
-        ttk.Label(left_col, text="Scanning Algorithm", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
-        self.algo_var = tk.StringVar(value=self.config.get("algo", "Dominant"))
-        self.algo_combo = ttk.Combobox(left_col, textvariable=self.algo_var, values=["Dominant", "Average", "Center Focus"], state="readonly", width=30, font=("Segoe UI", 10))
+        self.algo_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.algo_lbl.pack(anchor="w", pady=(0, 4))
+        self.algo_var = tk.StringVar()
+        self.algo_combo = ttk.Combobox(left_col, textvariable=self.algo_var, state="readonly", width=30, font=("Segoe UI", 10))
         self.algo_combo.pack(anchor="w", pady=(0, 2), ipady=4)
-        ttk.Label(left_col, text="How the script interprets screen colors.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.algo_combo.bind("<<ComboboxSelected>>", self._on_setting_change)
+        self.algo_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.algo_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Brightness
-        ttk.Label(left_col, text="Max Brightness (1–100)", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
+        self.bright_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.bright_lbl.pack(anchor="w", pady=(0, 4))
         self.bright_var = tk.StringVar(value=str(self.config.get("brightness", 100)))
         self.bright_entry = tk.Entry(left_col, textvariable=self.bright_var, bg="#16213e", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 10), width=10, relief="flat", bd=0, highlightthickness=1, highlightbackground="#333355", highlightcolor="#4ecca3")
         self.bright_entry.pack(anchor="w", pady=(0, 2), ipady=6, ipadx=6)
-        ttk.Label(left_col, text="Limits the maximum brightness sent to the LEDs. Default: 100.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.bright_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.bright_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Smoothness
-        ttk.Label(left_col, text="Transition Smoothness (1–100)", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
+        self.smooth_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.smooth_lbl.pack(anchor="w", pady=(0, 4))
         self.smooth_var = tk.StringVar(value=str(self.config.get("smoothness", 55)))
         self.smooth_entry = tk.Entry(left_col, textvariable=self.smooth_var, bg="#16213e", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 10), width=10, relief="flat", bd=0, highlightthickness=1, highlightbackground="#333355", highlightcolor="#4ecca3")
         self.smooth_entry.pack(anchor="w", pady=(0, 2), ipady=6, ipadx=6)
         self.smooth_hint_var = tk.StringVar()
-        ttk.Label(left_col, textvariable=self.smooth_hint_var, style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
-        self._update_smooth_hint()
+        ttk.Label(left_col, textvariable=self.smooth_hint_var, style="SmallSub.TLabel", wraplength=350, justify="left").pack(anchor="w", pady=(0, 16))
 
         # -- Min Brightness
-        ttk.Label(left_col, text="Min Brightness (0–100)", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
+        self.min_bright_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.min_bright_lbl.pack(anchor="w", pady=(0, 4))
         self.min_bright_var = tk.StringVar(value=str(self.config.get("min_brightness", 0)))
         self.min_bright_entry = tk.Entry(left_col, textvariable=self.min_bright_var, bg="#16213e", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 10), width=10, relief="flat", bd=0, highlightthickness=1, highlightbackground="#333355", highlightcolor="#4ecca3")
         self.min_bright_entry.pack(anchor="w", pady=(0, 2), ipady=6, ipadx=6)
-        ttk.Label(left_col, text="LEDs never go below this brightness. 0 = allow full black. Default: 0.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.min_bright_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.min_bright_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Black Threshold
-        ttk.Label(left_col, text="Black Threshold (1–100)", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
+        self.black_thresh_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.black_thresh_lbl.pack(anchor="w", pady=(0, 4))
         self.black_thresh_var = tk.StringVar(value=str(self.config.get("black_threshold", 20)))
         self.black_thresh_entry = tk.Entry(left_col, textvariable=self.black_thresh_var, bg="#16213e", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 10), width=10, relief="flat", bd=0, highlightthickness=1, highlightbackground="#333355", highlightcolor="#4ecca3")
         self.black_thresh_entry.pack(anchor="w", pady=(0, 2), ipady=6, ipadx=6)
-        ttk.Label(left_col, text="Pixels darker than this are treated as black. Default: 20.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.black_thresh_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.black_thresh_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Hotkey
-        ttk.Label(left_col, text="Global Hotkey", style="Field.TLabel").pack(anchor="w", pady=(0, 4))
-        self.hotkey_var = tk.StringVar(value=self.config.get("hotkey", "None"))
+        self.hotkey_lbl = ttk.Label(left_col, text="", style="Field.TLabel")
+        self.hotkey_lbl.pack(anchor="w", pady=(0, 4))
+        self.hotkey_var = tk.StringVar()
         self.hotkey_btn = tk.Button(left_col, textvariable=self.hotkey_var, command=self._record_hotkey, bg="#16213e", fg="#4ecca3", activebackground="#4ecca3", activeforeground="#1a1a2e", font=("Segoe UI", 10, "bold"), relief="flat", bd=0, highlightthickness=1, highlightbackground="#333355")
         self.hotkey_btn.pack(anchor="w", fill="x", pady=(0, 2), ipady=4)
-        ttk.Label(left_col, text="Click to map a keyboard shortcut to toggle Ambilight ON/OFF.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.hotkey_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.hotkey_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Device Sync
         self.sync_var = tk.BooleanVar(value=self.config.get("sync_devices", True))
-        self.sync_cb = ttk.Checkbutton(left_col, text="Sync all devices", variable=self.sync_var, style="Dark.TCheckbutton")
+        self.sync_cb = ttk.Checkbutton(left_col, text="", variable=self.sync_var, style="Dark.TCheckbutton")
         self.sync_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(left_col, text="Shows the same frames on all devices and compensates their delay. Update rate follows the slowest device (~3.6 FPS here). Separate motherboard headers may still differ. Default: on.", style="SmallSub.TLabel", wraplength=340, justify="left").pack(anchor="w", pady=(0, 16))
+        self.sync_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.sync_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Display Sync
         self.display_sync_var = tk.BooleanVar(value=self.config.get("display_sync", True))
-        self.display_sync_cb = ttk.Checkbutton(left_col, text="Turn off with display (Windows)", variable=self.display_sync_var, style="Dark.TCheckbutton")
+        self.display_sync_cb = ttk.Checkbutton(left_col, text="", variable=self.display_sync_var, style="Dark.TCheckbutton")
         self.display_sync_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(left_col, text="Disables Ambilight when the monitor goes to sleep or PC is locked.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.display_sync_hint_lbl = ttk.Label(left_col, text="", style="SmallSub.TLabel", wraplength=350, justify="left")
+        self.display_sync_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Checkboxes (RIGHT COLUMN)
         self.edge_var = tk.BooleanVar(value=self.config.get("edges", False))
-        self.edge_cb = ttk.Checkbutton(right_col, text="Edge Only", variable=self.edge_var, style="Dark.TCheckbutton")
+        self.edge_cb = ttk.Checkbutton(right_col, text="", variable=self.edge_var, style="Dark.TCheckbutton")
         self.edge_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Analyzes only the outer 15% of the screen. Gives accurate Ambilight effect at the edges.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.edge_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.edge_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.bars_var = tk.BooleanVar(value=self.config.get("bars", False))
-        self.bars_cb = ttk.Checkbutton(right_col, text="Skip Black Bars", variable=self.bars_var, style="Dark.TCheckbutton")
+        self.bars_cb = ttk.Checkbutton(right_col, text="", variable=self.bars_var, style="Dark.TCheckbutton")
         self.bars_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Ignores cinematic letterbox bands so movies don't artificially darken the lighting.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.bars_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.bars_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         self.sat_var = tk.BooleanVar(value=self.config.get("saturation", False))
-        self.sat_cb = ttk.Checkbutton(right_col, text="Saturation Boost (+50%)", variable=self.sat_var, style="Dark.TCheckbutton")
+        self.sat_cb = ttk.Checkbutton(right_col, text="", variable=self.sat_var, style="Dark.TCheckbutton")
         self.sat_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Makes colors punchy and vibrant. Great for muted games/movies.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.sat_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.sat_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.gamma_var = tk.BooleanVar(value=self.config.get("gamma", False))
-        self.gamma_cb = ttk.Checkbutton(right_col, text="Gamma Correction", variable=self.gamma_var, style="Dark.TCheckbutton")
+        self.gamma_cb = ttk.Checkbutton(right_col, text="", variable=self.gamma_var, style="Dark.TCheckbutton")
         self.gamma_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Adjusts LED brightness curve to match human perception.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.gamma_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.gamma_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.hdr_var = tk.BooleanVar(value=self.config.get("hdr", False))
-        self.hdr_cb = ttk.Checkbutton(right_col, text="Adaptive Brightness (HDR)", variable=self.hdr_var, style="Dark.TCheckbutton")
+        self.hdr_cb = ttk.Checkbutton(right_col, text="", variable=self.hdr_var, style="Dark.TCheckbutton")
         self.hdr_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Dims LEDs in dark scenes, flares in bright highlights.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.hdr_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.hdr_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.tray_var = tk.BooleanVar(value=self.config.get("tray", False))
-        self.tray_cb = ttk.Checkbutton(right_col, text="Minimize to System Tray", variable=self.tray_var, style="Dark.TCheckbutton")
+        self.tray_cb = ttk.Checkbutton(right_col, text="", variable=self.tray_var, style="Dark.TCheckbutton")
         self.tray_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="When you minimize the window, it hides in the taskbar tray.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.tray_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.tray_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.auto_var = tk.BooleanVar(value=self.config.get("autostart", False))
-        self.auto_cb = ttk.Checkbutton(right_col, text="Start with Windows", variable=self.auto_var, style="Dark.TCheckbutton", command=self._toggle_autostart)
+        self.auto_cb = ttk.Checkbutton(right_col, text="", variable=self.auto_var, style="Dark.TCheckbutton", command=self._toggle_autostart)
         self.auto_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Automatically launches the program hidden in the tray.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.auto_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.auto_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.autorun_var = tk.BooleanVar(value=self.config.get("autorun", False))
-        self.autorun_cb = ttk.Checkbutton(right_col, text="Auto-start Ambilight", variable=self.autorun_var, style="Dark.TCheckbutton")
+        self.autorun_cb = ttk.Checkbutton(right_col, text="", variable=self.autorun_var, style="Dark.TCheckbutton")
         self.autorun_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Automatically starts the Ambilight loop after an 8-second delay (waits for OpenRGB).", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.autorun_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.autorun_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         self.audio_var = tk.BooleanVar(value=self.config.get("audio", False))
-        self.audio_cb = ttk.Checkbutton(right_col, text="Audio Visualizer (Music Mode)", variable=self.audio_var, style="Dark.TCheckbutton")
+        self.audio_cb = ttk.Checkbutton(right_col, text="", variable=self.audio_var, style="Dark.TCheckbutton")
         self.audio_cb.pack(anchor="w", pady=(0, 2))
-        ttk.Label(right_col, text="Stops screen capture and pulses colors to the beat of computer audio.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 16))
+        self.audio_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.audio_hint_lbl.pack(anchor="w", pady=(0, 16))
 
         # -- Schedule: Auto-Start at time
         hours = [f"{h:02d}" for h in range(24)]
@@ -2247,25 +2737,29 @@ class AmbilightGUI:
         sched_start_frame = tk.Frame(right_col, bg="#1a1a2e")
         sched_start_frame.pack(anchor="w", fill="x", pady=(0, 2))
         self.sched_start_var = tk.BooleanVar(value=self.config.get("schedule_start_enabled", False))
-        ttk.Checkbutton(sched_start_frame, text="Schedule Start", variable=self.sched_start_var, style="Dark.TCheckbutton").pack(side="left")
+        self.sched_start_cb = ttk.Checkbutton(sched_start_frame, text="", variable=self.sched_start_var, style="Dark.TCheckbutton")
+        self.sched_start_cb.pack(side="left")
         self.sched_start_m_var = tk.StringVar(value=self.config.get("schedule_start_m", "00"))
         ttk.Combobox(sched_start_frame, textvariable=self.sched_start_m_var, values=minutes, state="readonly", width=3, font=("Segoe UI", 9)).pack(side="right", padx=(2, 0))
         tk.Label(sched_start_frame, text=":", bg="#1a1a2e", fg="#c4c4d4", font=("Segoe UI", 10, "bold")).pack(side="right")
         self.sched_start_h_var = tk.StringVar(value=self.config.get("schedule_start_h", "18"))
         ttk.Combobox(sched_start_frame, textvariable=self.sched_start_h_var, values=hours, state="readonly", width=3, font=("Segoe UI", 9)).pack(side="right")
-        ttk.Label(right_col, text="Automatically starts Ambilight at the chosen time.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 8))
+        self.sched_start_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.sched_start_hint_lbl.pack(anchor="w", pady=(0, 8))
 
         # -- Schedule: Auto-Stop at time
         sched_stop_frame = tk.Frame(right_col, bg="#1a1a2e")
         sched_stop_frame.pack(anchor="w", fill="x", pady=(0, 2))
         self.sched_stop_var = tk.BooleanVar(value=self.config.get("schedule_stop_enabled", False))
-        ttk.Checkbutton(sched_stop_frame, text="Schedule Stop", variable=self.sched_stop_var, style="Dark.TCheckbutton").pack(side="left")
+        self.sched_stop_cb = ttk.Checkbutton(sched_stop_frame, text="", variable=self.sched_stop_var, style="Dark.TCheckbutton")
+        self.sched_stop_cb.pack(side="left")
         self.sched_stop_m_var = tk.StringVar(value=self.config.get("schedule_stop_m", "00"))
         ttk.Combobox(sched_stop_frame, textvariable=self.sched_stop_m_var, values=minutes, state="readonly", width=3, font=("Segoe UI", 9)).pack(side="right", padx=(2, 0))
         tk.Label(sched_stop_frame, text=":", bg="#1a1a2e", fg="#c4c4d4", font=("Segoe UI", 10, "bold")).pack(side="right")
         self.sched_stop_h_var = tk.StringVar(value=self.config.get("schedule_stop_h", "02"))
         ttk.Combobox(sched_stop_frame, textvariable=self.sched_stop_h_var, values=hours, state="readonly", width=3, font=("Segoe UI", 9)).pack(side="right")
-        ttk.Label(right_col, text="Automatically stops Ambilight at the chosen time.", style="SmallSub.TLabel").pack(anchor="w", pady=(0, 20))
+        self.sched_stop_hint_lbl = ttk.Label(right_col, text="", style="SmallSub.TLabel", wraplength=360, justify="left")
+        self.sched_stop_hint_lbl.pack(anchor="w", pady=(0, 20))
 
         # -- Traces for Live Sync --
         self.fps_var.trace_add("write", self._on_setting_change)
@@ -2283,7 +2777,6 @@ class AmbilightGUI:
         self.display_sync_var.trace_add("write", self._on_setting_change)
         self.autorun_var.trace_add("write", self._on_setting_change)
         self.hdr_var.trace_add("write", self._on_setting_change)
-        self.algo_var.trace_add("write", self._on_setting_change)
         self.sched_start_var.trace_add("write", self._on_setting_change)
         self.sched_start_h_var.trace_add("write", self._on_setting_change)
         self.sched_start_m_var.trace_add("write", self._on_setting_change)
@@ -2296,16 +2789,18 @@ class AmbilightGUI:
         bottom_frame.pack(fill="x", pady=(20, 0))
 
         # -- Button
-        self.btn = tk.Button(bottom_frame, text="▶  START", command=self._toggle, bg="#4ecca3", fg="#1a1a2e", activebackground="#3dbb92", activeforeground="#1a1a2e", font=("Segoe UI", 13, "bold"), relief="flat", cursor="hand2", width=20, height=1, bd=0)
+        self.btn = tk.Button(bottom_frame, text="", command=self._toggle, bg="#4ecca3", fg="#1a1a2e", activebackground="#3dbb92", activeforeground="#1a1a2e", font=("Segoe UI", 13, "bold"), relief="flat", cursor="hand2", width=20, height=1, bd=0)
         self.btn.pack(pady=(0, 16), ipady=6)
 
         # -- Status
-        self.status_var = tk.StringVar(value="Stopped")
+        self.status_var = tk.StringVar()
         ttk.Label(bottom_frame, textvariable=self.status_var, style="Status.TLabel").pack()
 
         # -- Color bar
         self.color_bar = tk.Canvas(bottom_frame, height=6, bg="#333355", highlightthickness=0, bd=0)
         self.color_bar.pack(fill="x", pady=(12, 0))
+
+        self._apply_language()
 
     def _center_window(self):
         self.root.update_idletasks()
@@ -2323,21 +2818,22 @@ class AmbilightGUI:
     def _start(self):
         sel = self.monitor_combo.current()
         if sel < 0:
-            self.status_var.set("Error: select a monitor")
+            self._set_status("err_select_monitor")
             return
         mon = self.monitors[sel]
         
         self._on_setting_change() # Force update live variables
         
         if self.live_fps <= 0:
-            self.status_var.set("Error: FPS must be > 0")
+            self._set_status("err_fps")
             return
 
-        self.status_var.set("Connecting to OpenRGB…")
+        self._set_status("status_connecting")
         self.btn.config(state="disabled")
         self._connecting = True
         self._start_token += 1
         token = self._start_token
+        ui_lang = self.lang
         self.root.update()
 
         def status(msg):
@@ -2350,13 +2846,13 @@ class AmbilightGUI:
         def connect_and_run():
             try:
                 ambi = Ambilight(fps=self.live_fps, brightness=self.live_bright,
-                                 status_cb=status)
+                                 status_cb=status, lang=ui_lang)
             except (OpenRGBUnavailable, SystemExit) as exc:
-                msg = str(exc) or "OpenRGB SDK Server not found."
+                msg = str(exc) or tr(ui_lang, "err_sdk_not_found")
                 self.root.after(0, lambda: self._on_error(token, msg))
                 return
             except Exception as exc:
-                self.root.after(0, lambda e=exc: self._on_error(token, "Startup failed: %s" % e))
+                self.root.after(0, lambda e=exc: self._on_error(token, tr(ui_lang, "err_startup", error=e)))
                 return
 
             if token != self._start_token:
@@ -2372,27 +2868,23 @@ class AmbilightGUI:
             try:
                 self._run_loop(mon)
             except Exception as exc:
-                self.root.after(0, lambda e=exc: self._on_error(token, "Stopped: %s" % e))
+                self.root.after(0, lambda e=exc: self._on_error(token, tr(self.lang, "err_stopped", error=e)))
 
         self.thread = threading.Thread(target=connect_and_run, daemon=True)
         self.thread.start()
 
     def _connect_status(self, token, msg):
         if token == self._start_token and not self.running:
+            self._raw_status_text = msg
             self.status_var.set(msg)
 
     def _on_started(self):
         self._autostart_done = True
         self._connecting = False
-        self.btn.config(text="⏹  STOP", bg="#e94560", fg="#ffffff", activebackground="#d63450", state="normal")
+        self._raw_status_text = None
+        self.btn.config(text=self._t("btn_stop"), bg="#e94560", fg="#ffffff", activebackground="#d63450", state="normal")
         self.monitor_combo.config(state="disabled")
-        devs = len(self.ambilight.devices) if self.ambilight else 0
-        feats = []
-        if self.live_edges: feats.append("edges")
-        if self.live_bars: feats.append("skip-bars")
-        if self.live_audio: feats.append("audio")
-        extra = f"  •  {', '.join(feats)}" if feats else ""
-        self.status_var.set(f"Running  •  {devs} device(s){extra}")
+        self._refresh_status_text()
         self._bar_color = self._bar_shown = None
         if self._bar_job is not None:
             self.root.after_cancel(self._bar_job)
@@ -2428,9 +2920,10 @@ class AmbilightGUI:
         self.running = False
         self._connecting = False
         self.ambilight = None
-        self.btn.config(text="▶  START", bg="#4ecca3", fg="#1a1a2e",
+        self.btn.config(text=self._t("btn_start"), bg="#4ecca3", fg="#1a1a2e",
                         activebackground="#3dbb92", state="normal")
         self.monitor_combo.config(state="readonly")
+        self._raw_status_text = msg
         self.status_var.set(msg)
 
     def _stop(self):
@@ -2440,9 +2933,9 @@ class AmbilightGUI:
         self.running = False
         if self.ambilight:
             self.ambilight.stop()
-        self.btn.config(text="▶  START", bg="#4ecca3", fg="#1a1a2e", activebackground="#3dbb92")
+        self.btn.config(text=self._t("btn_start"), bg="#4ecca3", fg="#1a1a2e", activebackground="#3dbb92")
         self.monitor_combo.config(state="readonly")
-        self.status_var.set("Stopped")
+        self._set_status("status_stopped")
         self.color_bar.config(bg="#333355")
 
     @staticmethod
@@ -2732,10 +3225,10 @@ class AmbilightGUI:
         if self._connecting or self.running:
             return
         if not self.running and remaining > 0:
-            self.status_var.set(f"Auto-start in {remaining}s (waiting for OpenRGB)…")
+            self._set_status("status_autorun_wait", sec=remaining)
             self.root.after(1000, self._autorun_countdown, remaining - 1)
         elif not self.running:
-            self.status_var.set("Auto-starting Ambilight…")
+            self._set_status("status_autorun_go")
             self._start()
 
     def _check_schedule(self):
@@ -2804,10 +3297,10 @@ class AmbilightGUI:
         d.ellipse((14, 14, 50, 50), fill=(233, 69, 96, 255))
         
         menu = pystray.Menu(
-            pystray.MenuItem("Show Ambilight", self._show_window, default=True),
-            pystray.MenuItem("Exit", self._quit_from_tray)
+            pystray.MenuItem(self._t("tray_show"), self._show_window, default=True),
+            pystray.MenuItem(self._t("tray_exit"), self._quit_from_tray)
         )
-        self.icon = pystray.Icon("Ambilight", image, "Ambilight Desktop", menu)
+        self.icon = pystray.Icon("Ambilight", image, "Ambilight", menu)
         threading.Thread(target=self.icon.run, daemon=True).start()
 
     def _show_window(self, icon, item):
@@ -2842,6 +3335,15 @@ _CLI_FLAGS = frozenset((
 ))
 
 
+def _parse_lang_arg(argv):
+    for i, arg in enumerate(argv):
+        if arg == "--lang" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--lang="):
+            return arg.split("=", 1)[1]
+    return None
+
+
 def _wants_cli(argv):
     return any(a.split("=", 1)[0] in _CLI_FLAGS for a in argv)
 
@@ -2854,15 +3356,32 @@ _OPENRGB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "OpenRGB
 _PLUGIN_DLL = os.path.join(_OPENRGB_DIR, "plugins", "OpenRGBAmbilightPlugin.dll")
 
 
+def _detect_handover_language():
+    cli_lang = _parse_lang_arg(sys.argv[1:])
+    if cli_lang is not None:
+        return resolve_language(cli_lang)
+    plugin_cfg = os.path.join(_OPENRGB_DIR, "config", "plugins", "settings", "Ambilight.json")
+    lang = _read_config_language(plugin_cfg)
+    if lang != "auto":
+        return lang
+    openrgb_cfg = os.path.join(_OPENRGB_DIR, "config", "OpenRGB.json")
+    try:
+        with open(openrgb_cfg, "r", encoding="utf-8") as f:
+            ui = json.load(f).get("UserInterface", {})
+        orgb_lang = normalize_language(ui.get("language", ""))
+        if orgb_lang != "auto":
+            return orgb_lang
+    except Exception:
+        pass
+    return resolve_language(_read_config_language())
+
+
 def _hand_over_to_openrgb():
     from tkinter import messagebox
+    lang = _detect_handover_language()
     root = tk.Tk()
     root.withdraw()
-    if messagebox.askyesno(
-            "Ambilight",
-            "Ambilight now runs inside OpenRGB: the \"Ambilight\" tab in the OpenRGB "
-            "window, the Ambilight entry in OpenRGB's tray menu, and Ctrl+Alt+A. It "
-            "starts with OpenRGB at logon.\n\nOpen OpenRGB now?"):
+    if messagebox.askyesno("Ambilight", tr(lang, "handover_msg")):
         import subprocess
         subprocess.Popen([os.path.join(_OPENRGB_DIR, "OpenRGB.exe")], cwd=_OPENRGB_DIR)
     root.destroy()
@@ -2872,8 +3391,8 @@ if __name__ == "__main__":
     if _wants_cli(sys.argv[1:]):
         sys.argv = [a for a in sys.argv if a != "--cli"]
         if os.path.exists(_PLUGIN_DLL):
-            print("Note: the OpenRGB Ambilight plugin is installed. If it is running "
-                  "(OpenRGB tray > Ambilight), both will drive the LEDs.", flush=True)
+            note_lang = _parse_lang_arg(sys.argv[1:]) or _read_config_language()
+            print(tr(note_lang, "cli_plugin_note"), flush=True)
         main()
     elif os.path.exists(_PLUGIN_DLL) and "--legacy" not in sys.argv:
         _hand_over_to_openrgb()

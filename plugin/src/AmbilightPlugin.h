@@ -69,7 +69,8 @@ public:
     ambi::AmbilightEngine::Status   EngineStatus() const;
     std::vector<ambi::DeviceInfo>   Devices() const;
     QString                         Unavailable() const;
-    QString                         HotkeyError() const { return hotkey_error; }
+    QString                         HotkeyError() const;
+    void                            OnLanguageChanged();
     void                            SuspendHotkey();
     void                            ResumeHotkey();
 
@@ -111,9 +112,18 @@ private:
     std::unique_ptr<ambi::DisplayPowerWatcher>  power;
     std::unique_ptr<ambi::DeviceSender>         sender;
     std::unique_ptr<ambi::AmbilightEngine>      engine;
+    enum class HotkeyErrorKind
+    {
+        None,
+        ClientInstance,
+        AlreadyUsed,
+        Unavailable,
+    };
+
     std::unique_ptr<ambi::GlobalHotkey>         hotkey;
     std::string                                 bound_hotkey;
-    QString                                     hotkey_error;
+    HotkeyErrorKind                             hotkey_error_kind = HotkeyErrorKind::None;
+    QString                                     hotkey_error_arg;
 
     QTimer*                                     schedule_timer  = nullptr;
     QTimer*                                     save_timer      = nullptr;
@@ -121,6 +131,7 @@ private:
     QMenu*                                      tray_menu       = nullptr;
     QAction*                                    tray_toggle     = nullptr;
     QAction*                                    tray_music      = nullptr;
+    QAction*                                    tray_settings   = nullptr;
 
     QDate                                       last_start_fire;
     QDate                                       last_stop_fire;

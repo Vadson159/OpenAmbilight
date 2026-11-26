@@ -20,8 +20,20 @@
 namespace ambi
 {
 
+enum class UiLanguage
+{
+    Auto    = 0,
+    English = 1,
+    Russian = 2,
+};
+
 struct AmbilightSettings
 {
+    /*-----------------------------------------------------*\
+    | Interface                                             |
+    \*-----------------------------------------------------*/
+    UiLanguage   language               = UiLanguage::Auto;
+
     /*-----------------------------------------------------*\
     | Capture                                               |
     \*-----------------------------------------------------*/
@@ -64,6 +76,10 @@ struct AmbilightSettings
 
 const char*  AlgoName(Algo algo);
 Algo         AlgoFromName(const std::string& name);
+const char*  LanguageCode(UiLanguage language);
+UiLanguage   LanguageFromCode(const std::string& code);
+void         SetUiLanguage(UiLanguage language);
+UiLanguage   GetUiLanguage();
 
 class SettingsStore
 {

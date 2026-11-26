@@ -10,6 +10,7 @@
     "gamma": false,
     "hdr": false,
     "hotkey": "ctrl+alt+a",
+    "language": "auto",
     "min_brightness": 0,
     "monitor": 1,
     "monitor_device": "\\\\.\\DISPLAY1",

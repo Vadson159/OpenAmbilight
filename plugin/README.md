@@ -14,8 +14,12 @@ same capture, same colour maths, same per-device scheduler, same settings.
 - Double-clicking `OpenRGB.exe` (or `..\Ambilight.lnk`) brings the running
   OpenRGB window forward instead of opening a second copy.
 
-The tab and tray menu speak OpenRGB's language: Russian when OpenRGB runs
-with its Russian translation (as here), English otherwise (`src/UiText.h`).
+The tab and tray menu support **English** and **Russian** (`src/UiText.h`).
+By default (**Auto (OpenRGB)**), the plugin follows OpenRGB's active
+translation and retranslates live when you switch OpenRGB's language in
+Settings. You can also choose **English** or **Русский** explicitly in the
+language selector at the top right of the Ambilight tab (saved as `"language"`
+in `Ambilight.json`).
 
 ## Autostart
 

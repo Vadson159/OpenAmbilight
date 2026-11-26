@@ -1,5 +1,7 @@
 # OpenAmbilight
 
+**English** | [Русский](README.ru.md)
+
 Sync PC RGB with screen colors using OpenRGB.
 
 ![OpenAmbilight Preview](https://i.imgur.com/DGwdrtX.png)
@@ -61,6 +63,12 @@ Measurements, remaining hardware limits, and reproduction steps:
    python Ambilight.pyw --cli
    ```
 
+## Languages
+Both the OpenRGB plugin and the standalone Python app (`Ambilight.pyw`) support **English** and **Russian**:
+* Use the **Language / Язык** selector in the top-right corner of the UI to switch live between **Auto**, **English**, and **Русский**.
+* In **Auto** mode, the plugin follows OpenRGB's language (updating live when you change it in OpenRGB settings), and `Ambilight.pyw` follows your Windows UI language.
+* In CLI mode, pass `--lang en`, `--lang ru`, or `--lang auto`.
+
 ## Usage
 ```bash
 Ambilight.pyw                        # open GUI (or double-click)
@@ -70,6 +78,7 @@ python Ambilight.pyw --monitor 2     # specific monitor
 python Ambilight.pyw --width 1920    # monitor width hint
 python Ambilight.pyw --brightness 70 # cap brightness at 70%
 python Ambilight.pyw --no-sync       # independent device updates
+python Ambilight.pyw --lang ru       # interface language (auto, en, ru)
 python Ambilight.pyw --test          # test colors
 python Ambilight.pyw --list          # list devices
 python Ambilight.pyw --restore       # reset devices to default mode

@@ -157,6 +157,7 @@ static void FromJson(const QJsonObject& o, AmbilightSettings& s)
 {
     AmbilightSettings d;
 
+    s.language               = LanguageFromCode(JsonString(o, "language", LanguageCode(d.language)));
     s.monitor_device         = FromUtf8(JsonString(o, "monitor_device", ""));
     s.monitor_index          = JsonInt(o, "monitor", d.monitor_index);
     s.fps                    = JsonInt(o, "fps", d.fps);
@@ -189,6 +190,7 @@ static QJsonObject ToJson(const AmbilightSettings& s)
 {
     QJsonObject o;
 
+    o["language"]               = LanguageCode(s.language);
     o["monitor_device"]         = QString::fromStdWString(s.monitor_device);
     o["monitor"]                = s.monitor_index;
     o["fps"]                    = s.fps;
@@ -330,7 +332,8 @@ void AmbilightPlugin::Load(ResourceManagerInterface* resource_manager_ptr)
 
     if(client_mode)
     {
-        hotkey_error = Tr("The hotkey is handled by the OpenRGB server instance.", "Горячую клавишу обслуживает серверный экземпляр OpenRGB.");
+        hotkey_error_kind = HotkeyErrorKind::ClientInstance;
+        hotkey_error_arg.clear();
         Log("This OpenRGB is a client of another instance; Ambilight stays off here");
     }
     else
@@ -372,8 +375,8 @@ QMenu* AmbilightPlugin::GetTrayMenu()
 
         tray_menu->addSeparator();
 
-        QAction* settings = tray_menu->addAction(Tr("Ambilight settings…", "Настройки Ambilight…"));
-        connect(settings, &QAction::triggered, this, &AmbilightPlugin::ShowSettings);
+        tray_settings = tray_menu->addAction(Tr("Ambilight settings…", "Настройки Ambilight…"));
+        connect(tray_settings, &QAction::triggered, this, &AmbilightPlugin::ShowSettings);
 
         connect(tray_menu, &QMenu::aboutToShow, this, &AmbilightPlugin::UpdateTrayMenu);
         UpdateTrayMenu();
@@ -391,6 +394,8 @@ void AmbilightPlugin::Unload()
         tab->Detach();
         delete tab.data();
     }
+
+    SetUiLanguage(UiLanguage::Auto);
 }
 
 void AmbilightPlugin::Shutdown()
@@ -617,6 +622,30 @@ QString AmbilightPlugin::Unavailable() const
     return QString();
 }
 
+QString AmbilightPlugin::HotkeyError() const
+{
+    switch(hotkey_error_kind)
+    {
+        case HotkeyErrorKind::ClientInstance:
+            return Tr("The hotkey is handled by the OpenRGB server instance.", "Горячую клавишу обслуживает серверный экземпляр OpenRGB.");
+
+        case HotkeyErrorKind::AlreadyUsed:
+            return Tr("%1 is already used by another program", "Сочетание %1 уже занято другой программой").arg(hotkey_error_arg);
+
+        case HotkeyErrorKind::Unavailable:
+            return Tr("Hotkey unavailable: %1", "Горячая клавиша недоступна: %1").arg(hotkey_error_arg);
+
+        default:
+            return QString();
+    }
+}
+
+void AmbilightPlugin::OnLanguageChanged()
+{
+    SetUiLanguage(store.Get().language);
+    UpdateTrayMenu();
+}
+
 void AmbilightPlugin::Toggle()
 {
     if(IsRunning())
@@ -687,8 +716,13 @@ void AmbilightPlugin::UpdateTrayMenu()
 
     tray_toggle->setText(running ? Tr("Stop Ambilight", "Выключить Ambilight") : Tr("Start Ambilight", "Включить Ambilight"));
     tray_toggle->setEnabled(loaded && (running || !client_mode));
+    tray_music->setText(Tr("Music mode", "Музыкальный режим"));
     tray_music->setChecked(store.Get().audio);
     tray_music->setEnabled(loaded && !client_mode);
+    if(tray_settings)
+    {
+        tray_settings->setText(Tr("Ambilight settings…", "Настройки Ambilight…"));
+    }
 }
 
 void AmbilightPlugin::SetMusicMode(bool enabled)
@@ -753,6 +787,7 @@ void AmbilightPlugin::LoadSettings()
     {
         FromJson(json, s);
         store.Set(s);
+        SetUiLanguage(s.language);
         Log("Settings loaded from %s", settings_path.toUtf8().constData());
         return;
     }
@@ -779,6 +814,7 @@ void AmbilightPlugin::LoadSettings()
     }
 
     store.Set(s);
+    SetUiLanguage(s.language);
     SaveSettings();
 }
 
@@ -802,6 +838,8 @@ void AmbilightPlugin::SaveSettings()
 
 void AmbilightPlugin::SettingsEdited()
 {
+    SetUiLanguage(store.Get().language);
+
     if(save_timer)
     {
         save_timer->start();
@@ -823,7 +861,8 @@ void AmbilightPlugin::BindHotkey()
     std::string combo = store.Get().hotkey;
 
     hotkey.reset();
-    hotkey_error.clear();
+    hotkey_error_kind = HotkeyErrorKind::None;
+    hotkey_error_arg.clear();
     bound_hotkey = combo;
 
     if(combo.empty() || combo == "None")
@@ -841,9 +880,16 @@ void AmbilightPlugin::BindHotkey()
     }
     else
     {
-        hotkey_error = (error.find("already used") != std::string::npos)
-                     ? Tr("%1 is already used by another program", "Сочетание %1 уже занято другой программой").arg(QString::fromStdString(GlobalHotkey::Describe(combo)))
-                     : Tr("Hotkey unavailable: ", "Горячая клавиша недоступна: ") + QString::fromStdString(error);
+        if(error.find("already used") != std::string::npos)
+        {
+            hotkey_error_kind = HotkeyErrorKind::AlreadyUsed;
+            hotkey_error_arg  = QString::fromStdString(GlobalHotkey::Describe(combo));
+        }
+        else
+        {
+            hotkey_error_kind = HotkeyErrorKind::Unavailable;
+            hotkey_error_arg  = QString::fromStdString(error);
+        }
         Log("Hotkey %s: %s", combo.c_str(), error.c_str());
         hotkey.reset();
     }
